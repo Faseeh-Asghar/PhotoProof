@@ -61,6 +61,15 @@ export const uploadApi = {
   jobs: (page = 1) => api.get(`/api/upload/jobs?page=${page}`),
   jobStatus: (id: string) => api.get(`/api/upload/job/${id}`),
   downloadUrl: (id: string) => `${API_URL}/api/upload/download/${id}`,
+  guestUpload: (file: File) => {
+    const form = new FormData();
+    form.append('image', file);
+    return api.post('/api/upload/guest', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      responseType: 'blob',
+      timeout: 60000,
+    });
+  },
 };
 
 // ─── Admin ────────────────────────────────────────────────────────────────────

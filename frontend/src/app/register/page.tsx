@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ImageIcon, Mail, Lock, User, Building2, CreditCard, Eye, EyeOff, CheckCircle2, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ImageIcon, Mail, Lock, User, CreditCard, Eye, EyeOff, CheckCircle2, Loader2 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -16,7 +16,6 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
-    schoolName: '',
     transactionId: '',
     paymentMethod: 'jazzcash',
     paymentNote: '',
@@ -27,7 +26,6 @@ export default function RegisterPage() {
     if (!form.name.trim()) e.name = 'Full name is required';
     if (!form.email) e.email = 'Email is required';
     if (!form.password || form.password.length < 8) e.password = 'Password must be at least 8 characters';
-    if (!form.schoolName.trim()) e.schoolName = 'School name is required';
     return e;
   };
 
@@ -77,16 +75,16 @@ export default function RegisterPage() {
               <CheckCircle2 size={40} color="#10B981" />
             </div>
             <h2 style={{ marginBottom: 16 }}>Registration Submitted!</h2>
-            <p style={{ marginBottom: 32, lineHeight: 1.7 }}>
+            <p style={{ marginBottom: 32, lineHeight: 1.7, color: '#94A3B8' }}>
               Your account is pending payment verification. Here's what happens next:
             </p>
 
             <div style={{ textAlign: 'left', background: '#0D1322', borderRadius: 12, padding: 24, marginBottom: 32 }}>
               {[
-                ['📱', 'Send payment via JazzCash or EasyPaisa to the admin'],
+                ['📱', 'Send PKR 300 via JazzCash or EasyPaisa to admin'],
                 ['✉️', 'Include your email in the payment description'],
-                ['⏳', 'Admin will review and activate your account (usually < 24 hours)'],
-                ['🎉', 'You\'ll receive a confirmation email when activated'],
+                ['⏳', 'Admin verifies and activates your account (< 24 hours)'],
+                ['🎉', 'You receive a confirmation email and can login'],
               ].map(([icon, text], i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: i < 3 ? 16 : 0 }}>
                   <span style={{ fontSize: '1.1rem' }}>{icon}</span>
@@ -99,9 +97,9 @@ export default function RegisterPage() {
               background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.25)',
               borderRadius: 12, padding: 20, marginBottom: 32, textAlign: 'center',
             }}>
-              <p style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>Payment Contact</p>
-              <p style={{ color: '#94A3B8', fontSize: '0.85rem' }}>Contact admin via WhatsApp or email for payment details</p>
+              <p style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 700, marginBottom: 4 }}>Payment Contact</p>
               <p style={{ color: '#F1F5F9', fontWeight: 600, marginTop: 8 }}>faseehasghar167@gmail.com</p>
+              <p style={{ color: '#64748B', fontSize: '0.8rem', marginTop: 4 }}>Amount: PKR 300 / month</p>
             </div>
 
             <Link href="/login">
@@ -127,6 +125,7 @@ export default function RegisterPage() {
         animate={{ opacity: 1, y: 0 }}
         style={{ width: '100%', maxWidth: 480 }}
       >
+        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <Link href="/">
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
@@ -141,7 +140,7 @@ export default function RegisterPage() {
             </div>
           </Link>
           <h1 style={{ fontSize: '1.5rem', marginTop: 24, marginBottom: 8 }}>Create Account</h1>
-          <p style={{ color: '#64748B', fontSize: '0.9rem' }}>Register to start processing student photos</p>
+          <p style={{ color: '#64748B', fontSize: '0.9rem' }}>Register for PKR 300/month — unlimited batch processing</p>
         </div>
 
         <div className="card" style={{ padding: 32 }}>
@@ -158,7 +157,7 @@ export default function RegisterPage() {
             <Field label="Email Address" id="reg-email" error={errors.email}>
               <div style={{ position: 'relative' }}>
                 <Mail size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                <input id="reg-email" className="input" type="email" placeholder="admin@school.edu.pk"
+                <input id="reg-email" className="input" type="email" placeholder="you@gmail.com"
                   value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
                   style={{ paddingLeft: 42 }} />
               </div>
@@ -167,7 +166,7 @@ export default function RegisterPage() {
             <Field label="Password" id="reg-password" error={errors.password}>
               <div style={{ position: 'relative' }}>
                 <Lock size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                <input id="reg-password" className="input" type={showPw ? 'text' : 'password'} placeholder="Minimum 8 characters"
+                <input id="reg-password" className="input" type={showPw ? 'text' : 'password'} placeholder="At least 8 characters"
                   value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
                   style={{ paddingLeft: 42, paddingRight: 42 }} />
                 <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
@@ -176,40 +175,31 @@ export default function RegisterPage() {
               </div>
             </Field>
 
-            <Field label="School / Organization Name" id="reg-school" error={errors.schoolName}>
-              <div style={{ position: 'relative' }}>
-                <Building2 size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                <input id="reg-school" className="input" type="text" placeholder="City Model School, Lahore"
-                  value={form.schoolName} onChange={(e) => setForm({ ...form, schoolName: e.target.value })}
-                  style={{ paddingLeft: 42 }} />
-              </div>
-            </Field>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20, marginBottom: 20 }}>
+              <p style={{ color: '#64748B', fontSize: '0.82rem', marginBottom: 20, lineHeight: 1.6 }}>
+                <strong style={{ color: '#94A3B8' }}>Payment Info</strong> — Add your transaction ID after paying PKR 300.
+                Admin will verify and activate your account within 24 hours.
+              </p>
 
-            <div className="divider" />
+              <Field label="Payment Method" id="reg-payment-method">
+                <select id="reg-payment-method" className="input"
+                  value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
+                  <option value="jazzcash">JazzCash</option>
+                  <option value="easypaisa">EasyPaisa</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="other">Other</option>
+                </select>
+              </Field>
 
-            <p style={{ color: '#64748B', fontSize: '0.82rem', marginBottom: 20, lineHeight: 1.6 }}>
-              <strong style={{ color: '#94A3B8' }}>Payment Info (Optional)</strong><br />
-              You can add your transaction ID after making payment. Admin will contact you.
-            </p>
-
-            <Field label="Payment Method" id="reg-payment-method">
-              <select id="reg-payment-method" className="input"
-                value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
-                <option value="jazzcash">JazzCash</option>
-                <option value="easypaisa">EasyPaisa</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="other">Other</option>
-              </select>
-            </Field>
-
-            <Field label="Transaction ID (Optional)" id="reg-txn">
-              <div style={{ position: 'relative' }}>
-                <CreditCard size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                <input id="reg-txn" className="input" type="text" placeholder="TXN123456789"
-                  value={form.transactionId} onChange={(e) => setForm({ ...form, transactionId: e.target.value })}
-                  style={{ paddingLeft: 42 }} />
-              </div>
-            </Field>
+              <Field label="Transaction ID (Optional)" id="reg-txn">
+                <div style={{ position: 'relative' }}>
+                  <CreditCard size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
+                  <input id="reg-txn" className="input" type="text" placeholder="e.g. T123456789"
+                    value={form.transactionId} onChange={(e) => setForm({ ...form, transactionId: e.target.value })}
+                    style={{ paddingLeft: 42 }} />
+                </div>
+              </Field>
+            </div>
 
             <motion.button
               id="reg-submit"
@@ -217,7 +207,6 @@ export default function RegisterPage() {
               className="btn btn-primary btn-full"
               disabled={loading}
               whileHover={{ scale: loading ? 1 : 1.01 }}
-              style={{ marginTop: 8 }}
             >
               {loading ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : 'Create Account →'}
             </motion.button>
@@ -227,6 +216,9 @@ export default function RegisterPage() {
         <p style={{ textAlign: 'center', marginTop: 20, color: '#64748B', fontSize: '0.875rem' }}>
           Already have an account?{' '}
           <Link href="/login" style={{ color: '#818CF8', fontWeight: 600 }}>Sign in</Link>
+        </p>
+        <p style={{ textAlign: 'center', marginTop: 8 }}>
+          <Link href="/" style={{ color: '#475569', fontSize: '0.8rem' }}>← Back to home</Link>
         </p>
       </motion.div>
     </div>

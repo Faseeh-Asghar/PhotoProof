@@ -14,7 +14,6 @@ const registerValidation = [
     .withMessage('Password must be at least 8 characters')
     .matches(/^(?=.*[A-Za-z])(?=.*\d)/)
     .withMessage('Password must contain letters and numbers'),
-  body('schoolName').trim().notEmpty().withMessage('School name is required'),
 ];
 
 const register = async (req, res) => {

@@ -297,4 +297,30 @@ const downloadZip = async (req, res) => {
   }
 };
 
-module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip };
+
+// ─── Guest Upload (no auth, 1 image, returns processed file directly) ─────────
+const guestUpload = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image uploaded. Please select one image file.' });
+  }
+
+  try {
+    const { processImage } = require('../services/imageProcessor');
+
+    // Process in-memory — no DB, no queue
+    const processedBuffer = await processImage(req.file.buffer, req.file.originalname);
+
+    const outputName = `photoproof_guest_${Date.now()}.jpg`;
+
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Disposition', `attachment; filename="${outputName}"`);
+    res.setHeader('X-PhotoProof-Size', processedBuffer.length);
+    res.send(processedBuffer);
+  } catch (err) {
+    console.error('Guest upload error:', err);
+    return res.status(500).json({ error: 'Processing failed. Please try a different image.' });
+  }
+};
+
+module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload };
+
