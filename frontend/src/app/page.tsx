@@ -23,7 +23,7 @@ const features = [
 
 const steps = [
   { num: '01', title: 'Try Free', desc: 'Upload one photo instantly — no signup. See the result before paying.' },
-  { num: '02', title: 'Register & Pay', desc: 'Pay PKR 300/month via JazzCash or EasyPaisa. Admin activates within 24h.' },
+  { num: '02', title: 'Register & Pay', desc: 'Select your package and pay via JazzCash. Admin activates within 24h.' },
   { num: '03', title: 'Bulk Upload', desc: 'Drag & drop up to 100 student photos at once.' },
   { num: '04', title: 'Download ZIP', desc: 'All processed photos in one ZIP — perfectly formatted.' },
 ];
@@ -244,7 +244,7 @@ function GuestUploadWidget() {
               Need to process a whole class?
             </p>
             <p style={{ color: '#64748B', fontSize: '0.8rem', marginBottom: 12 }}>
-              Register for PKR 300/month — upload 100 photos at once, get one ZIP
+              Register and get up to 50 photos for 100 Rs, or 100 photos for 200 Rs!
             </p>
             <Link href="/register">
               <button className="btn btn-primary btn-sm">Register Now →</button>
@@ -316,16 +316,16 @@ export default function HomePage() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
             style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 64 }}
           >
-            <Link href="/register">
-              <button className="btn btn-primary btn-lg" style={{ gap: 8 }}>
-                Get Started — PKR 300/mo <ArrowRight size={18} />
-              </button>
-            </Link>
             <a href="#try-free">
-              <button className="btn btn-ghost btn-lg">
-                Try Free First ↓
+              <button className="btn btn-primary btn-lg">
+                Try It Free
               </button>
             </a>
+            <Link href="/register">
+              <button className="btn btn-ghost btn-lg" style={{ gap: 8 }}>
+                Get Started <ArrowRight size={18} />
+              </button>
+            </Link>
           </motion.div>
 
           {/* Stats */}
@@ -451,87 +451,94 @@ export default function HomePage() {
 
       {/* ── Pricing ── */}
       <section id="pricing" style={{ padding: '80px 24px', background: 'rgba(13,19,34,0.4)' }}>
-        <div style={{ maxWidth: 500, margin: '0 auto', textAlign: 'center' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', textAlign: 'center' }}>
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <h2 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', marginBottom: 12 }}>Simple Pricing</h2>
-            <p style={{ color: '#64748B', marginBottom: 48 }}>One plan. No hidden fees.</p>
+            <p style={{ color: '#64748B', marginBottom: 48 }}>Pay for what you need. No hidden fees.</p>
 
-            {/* Single plan card */}
-            <div style={{
-              background: 'rgba(26,35,56,0.8)',
-              border: '2px solid rgba(79,70,229,0.5)',
-              borderRadius: 20,
-              padding: '40px 32px',
-              position: 'relative',
-              overflow: 'hidden',
-            }}>
-              {/* Glow */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginBottom: 24 }}>
+              {/* Plan 1 */}
               <div style={{
-                position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)',
-                width: 200, height: 200, borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(79,70,229,0.2), transparent 70%)',
-                pointerEvents: 'none',
-              }} />
-
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                borderRadius: 20, padding: '4px 16px', marginBottom: 20, position: 'relative',
+                background: 'rgba(26,35,56,0.8)',
+                border: '2px solid rgba(79,70,229,0.3)',
+                borderRadius: 20,
+                padding: '40px 32px',
+                position: 'relative',
               }}>
-                <span style={{ color: 'white', fontSize: '0.8rem', fontWeight: 700 }}>School Plan</span>
-              </div>
-
-              <div style={{ marginBottom: 8, position: 'relative' }}>
-                <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '3.5rem', color: '#F1F5F9', lineHeight: 1 }}>
-                  300
-                </span>
-                <span style={{ color: '#64748B', fontSize: '1rem', marginLeft: 6 }}>PKR / month</span>
-              </div>
-              <p style={{ color: '#64748B', fontSize: '0.85rem', marginBottom: 32 }}>~$1.08 USD</p>
-
-              <div style={{ textAlign: 'left', marginBottom: 32 }}>
-                {[
-                  '500 student photos per month',
-                  'Bulk upload (100 at a time)',
-                  'White background, 600×800 px',
-                  'ZIP download of all processed photos',
-                  'Email notification on activation',
-                  'Pay via JazzCash / EasyPaisa',
-                  'Manual payment — no auto-billing',
-                ].map((item) => (
-                  <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                    <div style={{
-                      width: 20, height: 20, borderRadius: '50%',
-                      background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      <Check size={11} color="#10B981" />
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '3.5rem', color: '#F1F5F9', lineHeight: 1 }}>
+                    100
+                  </span>
+                  <span style={{ color: '#64748B', fontSize: '1rem', marginLeft: 6 }}>PKR</span>
+                </div>
+                <p style={{ color: '#818CF8', fontSize: '1.1rem', fontWeight: 600, marginBottom: 24 }}>Up to 50 Photos</p>
+                <div style={{ textAlign: 'left', marginBottom: 32 }}>
+                  {[
+                    '50 student photos',
+                    'Bulk upload processing',
+                    'White background, 600×800 px',
+                    'ZIP or individual JPEGs download',
+                  ].map((item) => (
+                    <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                      <Check size={16} color="#10B981" />
+                      <span style={{ color: '#94A3B8', fontSize: '0.875rem' }}>{item}</span>
                     </div>
-                    <span style={{ color: '#94A3B8', fontSize: '0.875rem' }}>{item}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <Link href="/register">
+                  <button className="btn btn-primary btn-full">Register & Pay 100 Rs</button>
+                </Link>
               </div>
 
-              <Link href="/register">
-                <button className="btn btn-primary btn-full btn-lg" style={{ position: 'relative' }}>
-                  Register & Pay PKR 300 →
-                </button>
-              </Link>
-
-              <p style={{ color: '#334155', fontSize: '0.78rem', marginTop: 16 }}>
-                You'll receive login access within 24 hours of payment verification
-              </p>
+              {/* Plan 2 */}
+              <div style={{
+                background: 'rgba(26,35,56,0.8)',
+                border: '2px solid rgba(79,70,229,0.5)',
+                borderRadius: 20,
+                padding: '40px 32px',
+                position: 'relative',
+              }}>
+                <div style={{
+                  position: 'absolute', top: 0, left: '50%', transform: 'translate(-50%, -50%)',
+                  background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                  borderRadius: 20, padding: '4px 16px',
+                }}>
+                  <span style={{ color: 'white', fontSize: '0.8rem', fontWeight: 700 }}>Best Value</span>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '3.5rem', color: '#F1F5F9', lineHeight: 1 }}>
+                    200
+                  </span>
+                  <span style={{ color: '#64748B', fontSize: '1rem', marginLeft: 6 }}>PKR</span>
+                </div>
+                <p style={{ color: '#818CF8', fontSize: '1.1rem', fontWeight: 600, marginBottom: 24 }}>Up to 100 Photos</p>
+                <div style={{ textAlign: 'left', marginBottom: 32 }}>
+                  {[
+                    '100 student photos',
+                    'Bulk upload processing',
+                    'White background, 600×800 px',
+                    'ZIP or individual JPEGs download',
+                  ].map((item) => (
+                    <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                      <Check size={16} color="#10B981" />
+                      <span style={{ color: '#94A3B8', fontSize: '0.875rem' }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <Link href="/register">
+                  <button className="btn btn-primary btn-full">Register & Pay 200 Rs</button>
+                </Link>
+              </div>
             </div>
 
             <div style={{
-              marginTop: 24, padding: '16px 20px',
+              marginTop: 24, padding: '24px 20px',
               background: 'rgba(79,70,229,0.06)', border: '1px solid rgba(79,70,229,0.15)',
               borderRadius: 12,
             }}>
-              <p style={{ color: '#64748B', fontSize: '0.82rem' }}>
-                Need higher quota? Contact us at{' '}
-                <a href="mailto:faseehasghar167@gmail.com" style={{ color: '#818CF8' }}>faseehasghar167@gmail.com</a>
-              </p>
+              <p style={{ color: '#F1F5F9', fontWeight: 600, marginBottom: 8 }}>Payment Info</p>
+              <p style={{ color: '#10B981', fontSize: '0.9rem', marginBottom: 4 }}>💳 JazzCash: <strong>0303 0934664</strong></p>
+              <p style={{ color: '#64748B', fontSize: '0.9rem' }}>💬 WhatsApp for queries: <strong>0306 9136380</strong></p>
             </div>
           </motion.div>
         </div>

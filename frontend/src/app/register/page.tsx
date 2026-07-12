@@ -83,7 +83,7 @@ export default function RegisterPage() {
 
             <div style={{ textAlign: 'left', background: '#0D1322', borderRadius: 12, padding: 24, marginBottom: 32 }}>
               {[
-                ['📱', 'Send PKR 300 via JazzCash or EasyPaisa to admin'],
+                ['📱', 'Send the required amount via JazzCash or EasyPaisa to admin'],
                 ['✉️', 'Include your email in the payment description'],
                 ['⏳', 'Admin verifies and activates your account (< 24 hours)'],
                 ['🎉', 'You receive a confirmation email and can login'],
@@ -102,7 +102,7 @@ export default function RegisterPage() {
               <p style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 700, marginBottom: 4 }}>Payment Contact Info</p>
               <p style={{ color: '#F1F5F9', fontWeight: 600, marginTop: 8 }}>Phone Number: 0306 9136380</p>
               <p style={{ color: '#F1F5F9', fontWeight: 600, marginTop: 4 }}>JazzCash Account: 0303 0934664</p>
-              <p style={{ color: '#64748B', fontSize: '0.8rem', marginTop: 12 }}>Amount: PKR 300 / month</p>
+              <p style={{ color: '#64748B', fontSize: '0.8rem', marginTop: 12 }}>Up to 50 photos: 100 Rs | Up to 100 photos: 200 Rs</p>
             </div>
 
             <Link href="/login">
@@ -143,7 +143,7 @@ export default function RegisterPage() {
             </div>
           </Link>
           <h1 style={{ fontSize: '1.5rem', marginTop: 24, marginBottom: 8 }}>Create Account</h1>
-          <p style={{ color: '#64748B', fontSize: '0.9rem' }}>Register for PKR 300/month — unlimited batch processing</p>
+          <p style={{ color: '#64748B', fontSize: '0.9rem' }}>Flexible pricing — pay only for what you need</p>
         </div>
 
         <div className="card" style={{ padding: 32 }}>
@@ -179,8 +179,21 @@ export default function RegisterPage() {
             </Field>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20, marginBottom: 20 }}>
+              <div style={{
+                background: 'rgba(79,70,229,0.05)', border: '1px solid rgba(79,70,229,0.15)',
+                borderRadius: 12, padding: 16, marginBottom: 20, textAlign: 'center',
+              }}>
+                <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: '0.9rem', marginBottom: 8 }}>Send Payment to Admin</p>
+                <p style={{ color: '#10B981', fontSize: '0.85rem', marginBottom: 4 }}>💳 JazzCash: <strong>0303 0934664</strong></p>
+                <p style={{ color: '#64748B', fontSize: '0.8rem', marginBottom: 12 }}>💬 WhatsApp for queries: <strong>0306 9136380</strong></p>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <span className="badge badge-primary">Up to 50 photos: 100 Rs</span>
+                  <span className="badge badge-primary">Up to 100 photos: 200 Rs</span>
+                </div>
+              </div>
+
               <p style={{ color: '#64748B', fontSize: '0.82rem', marginBottom: 20, lineHeight: 1.6 }}>
-                <strong style={{ color: '#94A3B8' }}>Payment Info</strong> — Add your transaction ID after paying PKR 300.
+                <strong style={{ color: '#94A3B8' }}>Payment Info</strong> — Add your transaction ID after paying.
                 Admin will verify and activate your account within 24 hours.
               </p>
 
