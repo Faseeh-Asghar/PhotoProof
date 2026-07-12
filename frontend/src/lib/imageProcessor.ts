@@ -6,6 +6,7 @@ export const MIN_SIZE_KB = 10;
 export const MAX_SIZE_KB = 20;
 
 const config: Config = {
+  model: 'isnet_quint8',
   debug: false,
 };
 
