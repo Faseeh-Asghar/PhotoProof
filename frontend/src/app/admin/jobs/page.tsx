@@ -127,7 +127,7 @@ export default function AdminJobsPage() {
                     {job.zip_url ? (
                       <a href={uploadApi.downloadUrl(job.id)} download>
                         <button className="btn btn-success btn-sm" style={{ gap: 6 }}>
-                          <Download size={13} /> ZIP
+                          <Download size={13} /> {job.total_files === 1 ? 'Photo' : 'ZIP'}
                         </button>
                       </a>
                     ) : <span style={{ color: '#334155', fontSize: '0.8rem' }}>—</span>}

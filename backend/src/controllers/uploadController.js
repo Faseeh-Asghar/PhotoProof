@@ -53,19 +53,22 @@ const uploadBatch = async (req, res) => {
     // Make sure dirs exist
     await fs.mkdir(ZIPS_DIR, { recursive: true });
 
-    // Instantly generate ZIP since files are already processed by the frontend
-    const zipPath = path.join(ZIPS_DIR, `${jobId}.zip`);
-    const output = require('fs').createWriteStream(zipPath);
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const isSingle = filesToProcess.length === 1;
+    const filePath = path.join(ZIPS_DIR, isSingle ? `${jobId}.png` : `${jobId}.zip`);
 
-    archive.pipe(output);
-
-    filesToProcess.forEach((file) => {
-      // Append file to archive directly, as they are pre-processed by the client
-      archive.append(file.buffer, { name: file.originalname });
-    });
-
-    await archive.finalize();
+    if (isSingle) {
+      // Save directly as PNG
+      await fs.writeFile(filePath, filesToProcess[0].buffer);
+    } else {
+      // Generate ZIP
+      const output = require('fs').createWriteStream(filePath);
+      const archive = archiver('zip', { zlib: { level: 6 } });
+      archive.pipe(output);
+      filesToProcess.forEach((file) => {
+        archive.append(file.buffer, { name: file.originalname });
+      });
+      await archive.finalize();
+    }
 
     // Create completed job record
     const expiresAt = new Date();
@@ -197,20 +200,28 @@ const downloadZip = async (req, res) => {
       return res.status(410).json({ error: 'Download link has expired' });
     }
 
-    const zipPath = require('path').join(ZIPS_DIR, `${id}.zip`);
-
+    let filePath = require('path').join(ZIPS_DIR, `${id}.png`);
+    let isPng = true;
+    
     try {
-      await fs.access(zipPath);
+      await fs.access(filePath);
     } catch {
-      return res.status(404).json({ error: 'ZIP file not found. It may have been cleaned up.' });
+      // If PNG not found, fallback to ZIP
+      isPng = false;
+      filePath = require('path').join(ZIPS_DIR, `${id}.zip`);
+      try {
+        await fs.access(filePath);
+      } catch {
+        return res.status(404).json({ error: 'File not found. It may have been cleaned up.' });
+      }
     }
 
-    const filename = `photoproof_${new Date(job.created_at).toISOString().split('T')[0]}_${id.slice(0, 8)}.zip`;
+    const filename = `photoproof_${new Date(job.created_at).toISOString().split('T')[0]}_${id.slice(0, 8)}${isPng ? '.png' : '.zip'}`;
 
-    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Type', isPng ? 'image/png' : 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    const fileStream = require('fs').createReadStream(zipPath);
+    const fileStream = require('fs').createReadStream(filePath);
     fileStream.pipe(res);
   } catch (err) {
     console.error('Download error:', err);

@@ -130,7 +130,7 @@ export default function JobsPage() {
                       <div>
                         <a href={uploadApi.downloadUrl(job.id)} download>
                           <button className="btn btn-success" style={{ gap: 8 }}>
-                            <Download size={15} /> Download ZIP
+                            <Download size={15} /> Download {job.total_files === 1 ? 'Photo' : 'ZIP'}
                           </button>
                         </a>
                         {job.zip_expires_at && (

@@ -343,7 +343,7 @@ export default function UploadPage() {
               <a href={uploadApi.downloadUrl(job.jobId)} download>
                 <button className="btn btn-success btn-full" style={{ gap: 8 }}>
                   <Download size={18} />
-                  Download Processed Photos (ZIP)
+                  Download Processed Photo{files.length === 1 ? '' : 's (ZIP)'}
                 </button>
               </a>
             )}
