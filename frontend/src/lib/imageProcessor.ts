@@ -17,7 +17,6 @@ export async function preloadAI(onProgress?: (pct: number) => void) {
     const { preload } = await import('@imgly/background-removal');
     await preload({
       model: 'isnet_quint8',
-      publicPath: '/static/imgly/',
       progress: (key: string, current: number, total: number) => {
         if (onProgress && total > 0 && key.startsWith('fetch')) {
           onProgress(Math.round((current / total) * 100));
@@ -66,7 +65,6 @@ export async function processImageLocally(
 
     const config: Config = {
       model: 'isnet_quint8', // small model ~40MB
-      publicPath: '/static/imgly/',
       progress: (key: string, current: number, total: number) => {
         if (onProgress && total > 0) {
           const pct = Math.round((current / total) * 100);
