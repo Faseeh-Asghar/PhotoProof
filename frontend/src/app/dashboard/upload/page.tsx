@@ -30,6 +30,7 @@ export default function UploadPage() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
+  const [statusMsg, setStatusMsg] = useState('Processing...');
   const [job, setJob] = useState<JobResult | null>(null);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
 
@@ -83,7 +84,7 @@ export default function UploadPage() {
         setUploadPct(Math.round(((i) / files.length) * 50)); // 0 to 50% for local processing
         try {
           const pf = await processImageLocally(files[i].file, (status, pct) => {
-            // Ignore individual file progress for batch, just update the overall batch percentage
+            setStatusMsg(`Photo ${i + 1}/${files.length}: ${status}`);
           });
           processedFiles.push(pf);
           successCount++;
@@ -98,6 +99,7 @@ export default function UploadPage() {
       }
 
       // 2. Upload processed files (50% to 100%)
+      setStatusMsg('Uploading zipped files to server...');
       setUploadPct(50);
       const res = await uploadApi.batch(processedFiles, (pct) => setUploadPct(50 + Math.round(pct / 2)));
       
@@ -269,7 +271,7 @@ export default function UploadPage() {
           style={{ marginBottom: 24 }}
         >
           {uploading ? (
-            <><Loader2 size={18} className="animate-spin" /> Uploading... {uploadPct}%</>
+            <><Loader2 size={18} className="animate-spin" /> {statusMsg} ({uploadPct}%)</>
           ) : (
             <><Upload size={18} /> Process {files.length} Photo{files.length !== 1 ? 's' : ''}</>
           )}
@@ -281,7 +283,7 @@ export default function UploadPage() {
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ color: '#64748B', fontSize: '0.85rem' }}>
-              {uploadPct < 50 ? 'Preparing files...' : 'Uploading and removing backgrounds (Server AI)...'}
+              {statusMsg}
             </span>
             <span style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 600 }}>{uploadPct}%</span>
           </div>
@@ -347,9 +349,10 @@ export default function UploadPage() {
             )}
 
             {job.status === 'processing' || job.status === 'queued' ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#64748B', fontSize: '0.85rem', marginTop: 8 }}>
-                <Loader2 size={14} className="animate-spin" />
-                Processing images in background. This page auto-updates.
+              <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center z-10 border border-gray-700/50">
+                <Loader2 className="w-10 h-10 text-white animate-spin mb-4" />
+                <p className="text-white font-medium mb-2">{statusMsg}</p>
+                <div className="w-48 h-1.5 bg-gray-800 rounded-full overflow-hidden"></div>
               </div>
             ) : null}
           </motion.div>
