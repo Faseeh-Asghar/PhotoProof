@@ -6,7 +6,6 @@ export const MIN_SIZE_KB = 10;
 export const MAX_SIZE_KB = 20;
 
 const config: Config = {
-  publicPath: 'https://static.remove-bg.io/assets/', // fallback if local assets not served
   debug: false,
 };
 
