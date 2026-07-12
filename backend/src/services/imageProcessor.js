@@ -105,7 +105,6 @@ async function processImage(inputBuffer) {
       .jpeg({
         quality,
         progressive: true,
-        mozjpeg: true,
         chromaSubsampling: '4:2:0',
       })
       .toBuffer();
@@ -121,15 +120,7 @@ async function processImage(inputBuffer) {
     attempts++;
   } while (attempts < maxAttempts);
 
-  const finalSizeKB = Math.round(output.length / 1024 * 10) / 10;
-
-  return {
-    buffer: output,
-    width: TARGET_WIDTH,
-    height: TARGET_HEIGHT,
-    sizeKB: finalSizeKB,
-    quality,
-  };
+  return output;
 }
 
 /**

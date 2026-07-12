@@ -46,12 +46,12 @@ imageQueue.process('process-image', 5, async (job) => {
     }
 
     // Process
-    const result = await processImage(inputBuffer);
+    const outputBuffer = await processImage(inputBuffer);
 
     // Save processed file
     const outputPath = path.join(PROCESSED_DIR, jobId, outputFileName);
     await fsPromises.mkdir(path.dirname(outputPath), { recursive: true });
-    await fsPromises.writeFile(outputPath, result.buffer);
+    await fsPromises.writeFile(outputPath, outputBuffer);
 
     // Update DB
     await query(
@@ -59,7 +59,7 @@ imageQueue.process('process-image', 5, async (job) => {
        SET status = 'completed', processed_name = $1,
            processed_size_bytes = $2, updated_at = NOW()
        WHERE id = $3`,
-      [outputFileName, result.buffer.length, fileId]
+      [outputFileName, outputBuffer.length, fileId]
     );
 
     // Update job progress
@@ -71,7 +71,7 @@ imageQueue.process('process-image', 5, async (job) => {
     );
 
     job.progress(100);
-    return { success: true, sizeKB: result.sizeKB };
+    return { success: true, sizeKB: Math.round(outputBuffer.length / 1024 * 10) / 10 };
   } catch (err) {
     console.error(`Image processing failed for file ${fileId}:`, err.message);
 

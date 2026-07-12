@@ -305,19 +305,25 @@ const guestUpload = async (req, res) => {
   }
 
   try {
-    const { processImage } = require('../services/imageProcessor');
+    const { processImage, validateImage } = require('../services/imageProcessor');
+
+    // Validate first — give clear error for bad files
+    const { valid, errors: valErrors } = await validateImage(req.file.buffer, req.file.originalname);
+    if (!valid) {
+      return res.status(400).json({ error: valErrors[0] || 'Invalid image file.' });
+    }
 
     // Process in-memory — no DB, no queue
-    const processedBuffer = await processImage(req.file.buffer, req.file.originalname);
+    const outputBuffer = await processImage(req.file.buffer);
 
     const outputName = `photoproof_guest_${Date.now()}.jpg`;
 
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Content-Disposition', `attachment; filename="${outputName}"`);
-    res.setHeader('X-PhotoProof-Size', processedBuffer.length);
-    res.send(processedBuffer);
+    res.setHeader('Content-Length', outputBuffer.length);
+    res.send(outputBuffer);
   } catch (err) {
-    console.error('Guest upload error:', err);
+    console.error('Guest upload error:', err.message, err.stack);
     return res.status(500).json({ error: 'Processing failed. Please try a different image.' });
   }
 };
