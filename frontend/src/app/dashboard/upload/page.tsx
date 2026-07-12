@@ -35,6 +35,10 @@ export default function UploadPage() {
   const [statusMsg, setStatusMsg] = useState('Processing...');
   const [job, setJob] = useState<JobResult | null>(null);
 
+  const [targetWidth, setTargetWidth] = useState(600);
+  const [targetHeight, setTargetHeight] = useState(800);
+  const [targetSizeKb, setTargetSizeKb] = useState(20);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.bmp'] },
     maxFiles: 100,
@@ -95,9 +99,13 @@ export default function UploadPage() {
         setFiles([...updatedFiles]);
 
         try {
-          const pf = await processImageLocally(updatedFiles[i].file, (status, pct) => {
-            setStatusMsg(`Photo ${i + 1}/${updatedFiles.length}: ${status}`);
-          });
+          const pf = await processImageLocally(
+            updatedFiles[i].file,
+            { width: targetWidth, height: targetHeight, maxSizeKb: targetSizeKb },
+            (status, pct) => {
+              setStatusMsg(`Photo ${i + 1}/${updatedFiles.length}: ${status}`);
+            }
+          );
           pFiles.push(pf);
           updatedFiles[i].processedFile = pf;
           updatedFiles[i].processedPreview = URL.createObjectURL(pf);
@@ -162,31 +170,44 @@ export default function UploadPage() {
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: '1.75rem', marginBottom: 8 }}>Upload Student Photos</h1>
         <p style={{ color: '#64748B' }}>
-          Drop up to 100 photos at once. Each will be automatically resized to 600×800px with a white background.
+          Drop up to 100 photos at once. Adjust the processing settings below to change output size and quality.
         </p>
       </div>
 
-      {/* Specs reminder */}
-      <div style={{
-        display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap',
-      }}>
-        {[
-          { label: 'Output Size', value: '600 × 800 px' },
-          { label: 'File Size', value: '10 – 20 KB' },
-          { label: 'Background', value: 'Pure White' },
-          { label: 'Format', value: 'JPEG' },
-        ].map((s) => (
-          <div key={s.label} style={{
-            background: '#141B2D',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 10, padding: '10px 20px',
-            display: 'flex', gap: 8, alignItems: 'center',
-          }}>
-            <Zap size={13} color="#818CF8" />
-            <span style={{ color: '#64748B', fontSize: '0.8rem' }}>{s.label}:</span>
-            <span style={{ color: '#F1F5F9', fontSize: '0.85rem', fontWeight: 600 }}>{s.value}</span>
+      {/* Processing Settings */}
+      <div className="card" style={{ padding: 24, marginBottom: 32 }}>
+        <h3 style={{ fontSize: '1.1rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Zap size={18} color="#818CF8" /> Processing Settings
+        </h3>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 32 }}>
+          {/* Resolution Width */}
+          <div>
+            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
+              <span>Width (px)</span>
+              <span style={{ color: '#F1F5F9', fontWeight: 600 }}>{targetWidth} px</span>
+            </label>
+            <input type="range" min="100" max="2000" step="10" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
           </div>
-        ))}
+
+          {/* Resolution Height */}
+          <div>
+            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
+              <span>Height (px)</span>
+              <span style={{ color: '#F1F5F9', fontWeight: 600 }}>{targetHeight} px</span>
+            </label>
+            <input type="range" min="100" max="2000" step="10" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
+          </div>
+
+          {/* Max Size */}
+          <div>
+            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
+              <span>Max File Size (KB)</span>
+              <span style={{ color: '#F1F5F9', fontWeight: 600 }}>{targetSizeKb} KB</span>
+            </label>
+            <input type="range" min="10" max="1000" step="5" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
+          </div>
+        </div>
       </div>
 
       {/* Drop Zone */}
@@ -309,7 +330,7 @@ export default function UploadPage() {
                           {(f.processedFile.size / 1024).toFixed(1)} KB
                         </span>
                         <span style={{ color: '#94A3B8', fontSize: '0.7rem' }}>
-                          600x800
+                          {targetWidth}x{targetHeight}
                         </span>
                         <a href={f.processedPreview} download={f.processedFile.name} title="Download individual JPEG">
                           <Download size={14} color="#818CF8" style={{ cursor: 'pointer' }} />

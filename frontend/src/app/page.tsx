@@ -90,7 +90,11 @@ function GuestUploadWidget() {
     setProgressMsg('Initializing AI model...');
     try {
       // Compress the image first to save bandwidth
-      const processedFile = await processImageLocally(file, (msg) => setProgressMsg(msg));
+      const processedFile = await processImageLocally(
+        file,
+        { width: 600, height: 800, maxSizeKb: 20 },
+        (msg) => setProgressMsg(msg)
+      );
       
       // Send to high-speed backend AI for background removal
       setProgressMsg('Uploading and removing background (Server AI)...');
