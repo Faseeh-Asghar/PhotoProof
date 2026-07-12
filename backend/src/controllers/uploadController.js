@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../db');
 const archiver = require('archiver');
+const { processImageBackground } = require('../services/aiService');
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads');
 const ZIPS_DIR = path.join(__dirname, '../../zips');
@@ -60,10 +61,18 @@ const uploadBatch = async (req, res) => {
 
     archive.pipe(output);
 
-    filesToProcess.forEach((file) => {
-      // Append file to archive
-      archive.append(file.buffer, { name: file.originalname });
-    });
+    // Process all files through the AI model sequentially to avoid memory spikes
+    for (const file of filesToProcess) {
+      try {
+        console.log(`Processing file: ${file.originalname}`);
+        const noBgBuffer = await processImageBackground(file.buffer);
+        const outName = file.originalname.replace(/\.[^/.]+$/, "") + ".png";
+        archive.append(noBgBuffer, { name: outName });
+      } catch (err) {
+        console.error(`Failed to process ${file.originalname}:`, err);
+        // If AI fails, maybe we just include the original? Or skip it. We'll skip for now.
+      }
+    }
 
     await archive.finalize();
 
@@ -220,17 +229,21 @@ const downloadZip = async (req, res) => {
 
 
 const guestUpload = async (req, res) => {
-  // Guest upload is now entirely processed on the client side!
-  // The client side shouldn't be calling this anymore, it just does it locally.
-  // We keep this route just in case someone hits it, but it just echoes back the image.
   if (!req.file) {
     return res.status(400).json({ error: 'No image uploaded.' });
   }
   
-  res.setHeader('Content-Type', 'image/jpeg');
-  res.setHeader('Content-Disposition', `attachment; filename="photoproof_guest_${Date.now()}.jpg"`);
-  res.setHeader('Content-Length', req.file.buffer.length);
-  res.send(req.file.buffer);
+  try {
+    const noBgBuffer = await processImageBackground(req.file.buffer);
+    
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="photoproof_guest_${Date.now()}.png"`);
+    res.setHeader('Content-Length', noBgBuffer.length);
+    res.send(noBgBuffer);
+  } catch (err) {
+    console.error('Guest upload error:', err);
+    return res.status(500).json({ error: 'Failed to process image' });
+  }
 };
 
 module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload };

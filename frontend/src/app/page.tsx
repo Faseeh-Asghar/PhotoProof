@@ -89,12 +89,17 @@ function GuestUploadWidget() {
     setLoading(true);
     setProgressMsg('Initializing AI model...');
     try {
-      // 100% Free Client-Side Processing!
+      // Compress the image first to save bandwidth
       const processedFile = await processImageLocally(file, (msg) => setProgressMsg(msg));
       
-      const url = URL.createObjectURL(processedFile);
+      // Send to high-speed backend AI for background removal
+      setProgressMsg('Uploading and removing background (Server AI)...');
+      const response = await uploadApi.guestUpload(processedFile);
+      
+      // response.data is a Blob containing the processed image
+      const url = URL.createObjectURL(response.data);
       setResultUrl(url);
-      toast.success('✅ Photo processed flawlessly!');
+      toast.success('✅ Photo processed flawlessly in the cloud!');
     } catch (err: any) {
       console.error(err);
       toast.error('Processing failed — please try a different image.');

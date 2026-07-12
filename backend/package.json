@@ -1,49 +1,48 @@
 {
-    "name":  "backend",
-    "version":  "1.0.0",
-    "description":  "",
-    "main":  "src/index.js",
-    "scripts":  {
-                    "test":  "echo \u0027No tests yet\u0027",
-                    "dev":  "nodemon src/index.js",
-                    "start":  "node src/index.js"
-                },
-    "keywords":  [
-
-                 ],
-    "author":  "",
-    "license":  "ISC",
-    "type":  "commonjs",
-    "dependencies":  {
-                         "archiver":  "^8.0.0",
-                         "axios":  "^1.18.1",
-                         "bcryptjs":  "^3.0.3",
-                         "bull":  "^4.16.5",
-                         "cors":  "^2.8.6",
-                         "dotenv":  "^17.4.2",
-                         "express":  "^4.21.2",
-                         "express-rate-limit":  "^7.5.0",
-                         "express-validator":  "^7.3.2",
-                         "form-data":  "^4.0.6",
-                         "helmet":  "^8.2.0",
-                         "jsonwebtoken":  "^9.0.3",
-                         "morgan":  "^1.11.0",
-                         "multer":  "^1.4.5-lts.1",
-                         "pg":  "^8.22.0",
-                         "resend":  "^6.17.1",
-                         "sharp":  "^0.35.3",
-                         "uuid":  "^14.0.1"
-                     },
-    "devDependencies":  {
-                            "@types/archiver":  "^8.0.0",
-                            "@types/bcryptjs":  "^2.4.6",
-                            "@types/cors":  "^2.8.19",
-                            "@types/express":  "^4.17.21",
-                            "@types/jsonwebtoken":  "^9.0.10",
-                            "@types/multer":  "^2.2.0",
-                            "@types/node":  "^26.1.1",
-                            "@types/uuid":  "^10.0.0",
-                            "nodemon":  "^3.1.14",
-                            "typescript":  "^6.0.3"
-                        }
+    "name": "backend",
+    "version": "1.0.0",
+    "description": "",
+    "main": "src/index.js",
+    "scripts": {
+        "test": "echo 'No tests yet'",
+        "dev": "nodemon src/index.js",
+        "start": "node src/index.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "dependencies": {
+        "@imgly/background-removal-node": "^1.4.5",
+        "archiver": "^8.0.0",
+        "axios": "^1.18.1",
+        "bcryptjs": "^3.0.3",
+        "bull": "^4.16.5",
+        "cors": "^2.8.6",
+        "dotenv": "^17.4.2",
+        "express": "^4.21.2",
+        "express-rate-limit": "^7.5.0",
+        "express-validator": "^7.3.2",
+        "form-data": "^4.0.6",
+        "helmet": "^8.2.0",
+        "jsonwebtoken": "^9.0.3",
+        "morgan": "^1.11.0",
+        "multer": "^1.4.5-lts.1",
+        "pg": "^8.22.0",
+        "resend": "^6.17.1",
+        "sharp": "^0.35.3",
+        "uuid": "^14.0.1"
+    },
+    "devDependencies": {
+        "@types/archiver": "^8.0.0",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/cors": "^2.8.19",
+        "@types/express": "^4.17.21",
+        "@types/jsonwebtoken": "^9.0.10",
+        "@types/multer": "^2.2.0",
+        "@types/node": "^26.1.1",
+        "@types/uuid": "^10.0.0",
+        "nodemon": "^3.1.14",
+        "typescript": "^6.0.3"
+    }
 }

@@ -72,7 +72,7 @@ export default function UploadPage() {
     setUploadPct(0);
 
     try {
-      toast.success('Starting local AI processing...');
+      toast.success('Preparing files for upload...');
       
       const processedFiles: File[] = [];
       let successCount = 0;
@@ -82,7 +82,9 @@ export default function UploadPage() {
       for (let i = 0; i < files.length; i++) {
         setUploadPct(Math.round(((i) / files.length) * 50)); // 0 to 50% for local processing
         try {
-          const pf = await processImageLocally(files[i].file);
+          const pf = await processImageLocally(files[i].file, (status, pct) => {
+            // Ignore individual file progress for batch, just update the overall batch percentage
+          });
           processedFiles.push(pf);
           successCount++;
         } catch (e) {
@@ -279,7 +281,7 @@ export default function UploadPage() {
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ color: '#64748B', fontSize: '0.85rem' }}>
-              {uploadPct < 50 ? 'Removing background (AI)...' : 'Uploading processed files...'}
+              {uploadPct < 50 ? 'Preparing files...' : 'Uploading and removing backgrounds (Server AI)...'}
             </span>
             <span style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 600 }}>{uploadPct}%</span>
           </div>
