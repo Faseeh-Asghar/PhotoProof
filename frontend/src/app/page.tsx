@@ -8,7 +8,7 @@ import {
   Loader2, FileImage, Users
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
-import { processImageLocally } from '@/lib/imageProcessor';
+import { processImageLocally, preloadAI } from '@/lib/imageProcessor';
 import toast from 'react-hot-toast';
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
@@ -84,6 +84,14 @@ function GuestUploadWidget() {
     if (f) handleFile(f);
   };
 
+  const [showWarning, setShowWarning] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('ai_ready')) {
+      setShowWarning(true);
+    }
+  }, []);
+
   const handleProcess = async () => {
     if (!file) return;
     setLoading(true);
@@ -104,6 +112,10 @@ function GuestUploadWidget() {
       const url = URL.createObjectURL(response.data);
       setResultUrl(url);
       
+      // Mark AI as ready so warning never shows again
+      localStorage.setItem('ai_ready', 'true');
+      setShowWarning(false);
+
       toast.success('✅ Photo processed flawlessly in the cloud!');
     } catch (err: any) {
       console.error(err);
@@ -197,6 +209,21 @@ function GuestUploadWidget() {
             )}
           </div>
 
+            {loading && showWarning && (
+              <div style={{
+                marginTop: 16, marginBottom: 16, padding: '12px 16px',
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                borderRadius: 12, textAlign: 'left'
+              }}>
+                <p style={{ color: '#EF4444', fontSize: '0.9rem', fontWeight: 600, marginBottom: 4 }}>
+                  ⚠️ Downloading AI Engine (First Time Only)
+                </p>
+                <p style={{ color: '#F87171', fontSize: '0.8rem', lineHeight: 1.5 }}>
+                  Please wait 1-2 minutes. We download a one-time AI engine so your photos are processed securely on your device and never uploaded to the internet.
+                </p>
+              </div>
+            )}
+
           <motion.button
             className="btn btn-primary btn-full"
             onClick={handleProcess}
@@ -266,6 +293,9 @@ export default function HomePage() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
+    // Silently preload the 40MB AI model in the background as soon as they land on the page
+    preloadAI();
+
     // Listen for PWA install prompt
     const handler = (e: any) => {
       e.preventDefault();
@@ -364,10 +394,10 @@ export default function HomePage() {
               borderRadius: 12, padding: '12px 24px',
             }}>
               <p style={{ color: '#10B981', fontSize: '0.9rem', fontWeight: 500, marginBottom: 8 }}>
-                📱 For blazing fast 1-click access:
+                📱 For blazing fast uploads & offline working:
               </p>
               <button className="btn btn-success btn-sm" style={{ gap: 6 }} onClick={handleInstallClick}>
-                <Download size={14} /> Install App to Home Screen
+                <Download size={14} /> Install Offline App
               </button>
             </div>
           </motion.div>

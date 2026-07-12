@@ -4,7 +4,6 @@ const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../db');
 const archiver = require('archiver');
-const { removeBackground } = require('@imgly/background-removal-node');
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads');
 const ZIPS_DIR = path.join(__dirname, '../../zips');
@@ -58,32 +57,16 @@ const uploadBatch = async (req, res) => {
     const filePath = path.join(ZIPS_DIR, isSingle ? `${jobId}.png` : `${jobId}.zip`);
 
     if (isSingle) {
-      // Process AI
-      const blob = new Blob([filesToProcess[0].buffer], { type: filesToProcess[0].mimetype });
-      const resultBlob = await removeBackground(blob);
-      const arrayBuffer = await resultBlob.arrayBuffer();
-      const outBuffer = Buffer.from(arrayBuffer);
-      
       // Save directly as PNG
-      await fs.writeFile(filePath, outBuffer);
+      await fs.writeFile(filePath, filesToProcess[0].buffer);
     } else {
       // Generate ZIP
       const output = require('fs').createWriteStream(filePath);
       const archive = archiver('zip', { zlib: { level: 6 } });
       archive.pipe(output);
-      
-      for (const file of filesToProcess) {
-        try {
-          const blob = new Blob([file.buffer], { type: file.mimetype });
-          const resultBlob = await removeBackground(blob);
-          const arrayBuffer = await resultBlob.arrayBuffer();
-          const outBuffer = Buffer.from(arrayBuffer);
-          archive.append(outBuffer, { name: file.originalname.replace(/\.[^/.]+$/, "") + ".png" });
-        } catch (e) {
-          console.error('AI Processing failed for file in batch', e);
-          archive.append(file.buffer, { name: file.originalname }); // fallback to original
-        }
-      }
+      filesToProcess.forEach((file) => {
+        archive.append(file.buffer, { name: file.originalname });
+      });
       await archive.finalize();
     }
 
@@ -252,20 +235,10 @@ const guestUpload = async (req, res) => {
     return res.status(400).json({ error: 'No image uploaded.' });
   }
   
-  try {
-    const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-    const resultBlob = await removeBackground(blob);
-    const arrayBuffer = await resultBlob.arrayBuffer();
-    const outBuffer = Buffer.from(arrayBuffer);
-
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Content-Disposition', `attachment; filename="photoproof_guest_${Date.now()}.png"`);
-    res.setHeader('Content-Length', outBuffer.length);
-    res.send(outBuffer);
-  } catch (err) {
-    console.error('Guest AI processing error:', err);
-    res.status(500).json({ error: 'AI Background Removal Failed on Server.' });
-  }
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Content-Disposition', `attachment; filename="photoproof_guest_${Date.now()}.png"`);
+  res.setHeader('Content-Length', req.file.buffer.length);
+  res.send(req.file.buffer);
 };
 
 module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload };

@@ -6,7 +6,7 @@ import {
   Upload, X, CheckCircle, AlertCircle, Download, FileImage, Trash2, Zap, Loader2, ImageIcon, Image as ImageIcon2
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
-import { processImageLocally } from '@/lib/imageProcessor';
+import { processImageLocally, preloadAI } from '@/lib/imageProcessor';
 import toast from 'react-hot-toast';
 
 interface FileItem {
@@ -29,6 +29,10 @@ interface JobResult {
 }
 
 export default function UploadPage() {
+  useEffect(() => {
+    preloadAI();
+  }, []);
+
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
