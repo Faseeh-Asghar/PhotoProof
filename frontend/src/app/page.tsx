@@ -94,29 +94,36 @@ function GuestUploadWidget() {
 
   const handleProcess = async () => {
     if (!file) return;
+
+    // Check lifetime limit
+    const uses = parseInt(localStorage.getItem('guest_uses') || '0', 10);
+    if (uses >= 3) {
+      toast.error('Free limit reached (3/3 lifetime). Please sign up for unlimited access!');
+      return;
+    }
+
     setLoading(true);
     setProgressMsg('Initializing AI model...');
     try {
-      // Compress the image first to save bandwidth
+      // 100% Offline AI Processing
       const processedFile = await processImageLocally(
         file,
         { width: 600, height: 800, maxSizeKb: 20 },
         (msg) => setProgressMsg(msg)
       );
       
-      // Send to high-speed backend AI for background removal
-      setProgressMsg('Uploading and removing background (Server AI)...');
-      const response = await uploadApi.guestUpload(processedFile);
-      
-      // response.data is a Blob containing the processed image
-      const url = URL.createObjectURL(response.data);
+      // We skip the backend entirely for offline execution!
+      const url = URL.createObjectURL(processedFile);
       setResultUrl(url);
+      
+      // Increment lifetime usage
+      localStorage.setItem('guest_uses', (uses + 1).toString());
       
       // Mark AI as ready so warning never shows again
       localStorage.setItem('ai_ready', 'true');
       setShowWarning(false);
 
-      toast.success('✅ Photo processed flawlessly in the cloud!');
+      toast.success('✅ Photo processed flawlessly (100% Offline)!');
     } catch (err: any) {
       console.error(err);
       toast.error('Processing failed — please try a different image.');

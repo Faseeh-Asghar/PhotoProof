@@ -11,11 +11,11 @@ const uploadLimiter = rateLimit({
   message: { error: 'Too many uploads. Please wait a moment.' },
 });
 
-// Guest: 5 free tries per hour per IP
+// Guest: 3 free tries
 const guestLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5,
-  message: { error: 'Free limit reached (5/hour). Sign up for unlimited batch processing.' },
+  max: 3,
+  message: { error: 'Free limit reached. Sign up for unlimited batch processing.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
