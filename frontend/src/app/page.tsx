@@ -84,6 +84,14 @@ function GuestUploadWidget() {
     if (f) handleFile(f);
   };
 
+  const [showWarning, setShowWarning] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('ai_ready')) {
+      setShowWarning(true);
+    }
+  }, []);
+
   const handleProcess = async () => {
     if (!file) return;
     setLoading(true);
@@ -103,6 +111,11 @@ function GuestUploadWidget() {
       // response.data is a Blob containing the processed image
       const url = URL.createObjectURL(response.data);
       setResultUrl(url);
+      
+      // Mark AI as ready so warning never shows again
+      localStorage.setItem('ai_ready', 'true');
+      setShowWarning(false);
+
       toast.success('✅ Photo processed flawlessly in the cloud!');
     } catch (err: any) {
       console.error(err);
@@ -196,7 +209,7 @@ function GuestUploadWidget() {
             )}
           </div>
 
-            {loading && (
+            {loading && showWarning && (
               <div style={{
                 marginTop: 16, marginBottom: 16, padding: '12px 16px',
                 background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
