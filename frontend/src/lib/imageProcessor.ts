@@ -26,6 +26,7 @@ export async function preloadAI(onProgress?: (pct: number) => void) {
     console.log('AI Model preloaded successfully');
   } catch (e) {
     console.error('Failed to preload AI Model', e);
+    throw e;
   } finally {
     isPreloading = false;
   }
