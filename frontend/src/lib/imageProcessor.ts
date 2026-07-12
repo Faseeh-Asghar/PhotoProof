@@ -1,4 +1,4 @@
-import { removeBackground, Config } from '@imgly/background-removal';
+import type { Config } from '@imgly/background-removal';
 
 export const MAX_SIZE_MB = 10;
 export const MAX_SIZE_KB = 20;
@@ -7,6 +7,28 @@ export interface ProcessingOptions {
   width: number;
   height: number;
   maxSizeKb: number;
+}
+
+let isPreloading = false;
+export async function preloadAI(onProgress?: (pct: number) => void) {
+  if (isPreloading) return;
+  isPreloading = true;
+  try {
+    const { preload } = await import('@imgly/background-removal');
+    await preload({
+      model: 'isnet_quint8',
+      progress: (key: string, current: number, total: number) => {
+        if (onProgress && total > 0 && key.startsWith('fetch')) {
+          onProgress(Math.round((current / total) * 100));
+        }
+      }
+    });
+    console.log('AI Model preloaded successfully');
+  } catch (e) {
+    console.error('Failed to preload AI Model', e);
+  } finally {
+    isPreloading = false;
+  }
 }
 
 /**
@@ -38,6 +60,8 @@ export async function processImageLocally(
     if (onProgress) {
       onProgress('Downloading AI (First time only)...', 0);
     }
+
+    const { removeBackground } = await import('@imgly/background-removal');
 
     const config: Config = {
       model: 'isnet_quint8', // small model ~40MB

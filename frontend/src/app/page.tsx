@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,7 +8,7 @@ import {
   Loader2, FileImage, Users
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
-import { processImageLocally } from '@/lib/imageProcessor';
+import { processImageLocally, preloadAI } from '@/lib/imageProcessor';
 import toast from 'react-hot-toast';
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
@@ -262,6 +262,11 @@ function GuestUploadWidget() {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
+  useEffect(() => {
+    // Silently preload the 40MB AI model in the background as soon as they land on the page
+    preloadAI();
+  }, []);
+
   return (
     <div>
       <Navbar />

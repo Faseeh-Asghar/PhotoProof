@@ -1,12 +1,12 @@
 'use client';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, X, CheckCircle, AlertCircle, Download, FileImage, Trash2, Zap, Loader2, ImageIcon, Image as ImageIcon2
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
-import { processImageLocally } from '@/lib/imageProcessor';
+import { processImageLocally, preloadAI } from '@/lib/imageProcessor';
 import toast from 'react-hot-toast';
 
 interface FileItem {
@@ -29,6 +29,10 @@ interface JobResult {
 }
 
 export default function UploadPage() {
+  useEffect(() => {
+    preloadAI();
+  }, []);
+
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
@@ -93,29 +97,38 @@ export default function UploadPage() {
 
       // 1. Process files locally and update UI
       const updatedFiles = [...files];
-      for (let i = 0; i < updatedFiles.length; i++) {
-        setUploadPct(Math.round(((i) / updatedFiles.length) * 50)); 
-        updatedFiles[i].status = 'processing';
+      const CONCURRENCY_LIMIT = 3;
+
+      for (let i = 0; i < updatedFiles.length; i += CONCURRENCY_LIMIT) {
+        const chunk = updatedFiles.slice(i, i + CONCURRENCY_LIMIT);
+        
+        // Mark chunk as processing
+        chunk.forEach(f => f.status = 'processing');
         setFiles([...updatedFiles]);
 
-        try {
-          const pf = await processImageLocally(
-            updatedFiles[i].file,
-            { width: targetWidth, height: targetHeight, maxSizeKb: targetSizeKb },
-            (status, pct) => {
-              setStatusMsg(`Photo ${i + 1}/${updatedFiles.length}: ${status}`);
-            }
-          );
-          pFiles.push(pf);
-          updatedFiles[i].processedFile = pf;
-          updatedFiles[i].processedPreview = URL.createObjectURL(pf);
-          updatedFiles[i].status = 'done';
-          successCount++;
-        } catch (e) {
-          console.error('Failed to process', updatedFiles[i].file.name, e);
-          updatedFiles[i].status = 'error';
-          failCount++;
-        }
+        await Promise.all(chunk.map(async (fileItem, indexInChunk) => {
+          const globalIndex = i + indexInChunk;
+          try {
+            const pf = await processImageLocally(
+              fileItem.file,
+              { width: targetWidth, height: targetHeight, maxSizeKb: targetSizeKb },
+              (status) => {
+                setStatusMsg(`Processing Batch ${Math.floor(i / CONCURRENCY_LIMIT) + 1}...`);
+              }
+            );
+            pFiles.push(pf);
+            updatedFiles[globalIndex].processedFile = pf;
+            updatedFiles[globalIndex].processedPreview = URL.createObjectURL(pf);
+            updatedFiles[globalIndex].status = 'done';
+            successCount++;
+          } catch (e) {
+            console.error('Failed to process', fileItem.file.name, e);
+            updatedFiles[globalIndex].status = 'error';
+            failCount++;
+          }
+        }));
+
+        setUploadPct(Math.round(((i + chunk.length) / updatedFiles.length) * 50)); 
         setFiles([...updatedFiles]);
       }
 

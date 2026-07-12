@@ -11,6 +11,8 @@ export const metadata: Metadata = {
     description: 'Process hundreds of student photos instantly. White background, perfect size.',
     type: 'website',
   },
+  manifest: '/manifest.json',
+  themeColor: '#0F172A',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
