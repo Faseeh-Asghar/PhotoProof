@@ -196,6 +196,21 @@ function GuestUploadWidget() {
             )}
           </div>
 
+            {loading && (
+              <div style={{
+                marginTop: 16, marginBottom: 16, padding: '12px 16px',
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                borderRadius: 12, textAlign: 'left'
+              }}>
+                <p style={{ color: '#EF4444', fontSize: '0.9rem', fontWeight: 600, marginBottom: 4 }}>
+                  ⚠️ Downloading AI Engine (First Time Only)
+                </p>
+                <p style={{ color: '#F87171', fontSize: '0.8rem', lineHeight: 1.5 }}>
+                  Please wait 1-2 minutes. We download a one-time AI engine so your photos are processed securely on your device and never uploaded to the internet.
+                </p>
+              </div>
+            )}
+
           <motion.button
             className="btn btn-primary btn-full"
             onClick={handleProcess}
@@ -262,10 +277,29 @@ function GuestUploadWidget() {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
   useEffect(() => {
     // Silently preload the 40MB AI model in the background as soon as they land on the page
     preloadAI();
+
+    // Listen for PWA install prompt
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
+    } else {
+      toast.error('App installation is not supported or already installed. Try from your browser menu.');
+    }
+  };
 
   return (
     <div>
@@ -323,7 +357,7 @@ export default function HomePage() {
 
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-            style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 64 }}
+            style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}
           >
             <a href="#try-free">
               <button className="btn btn-primary btn-lg">
@@ -335,6 +369,24 @@ export default function HomePage() {
                 Get Started <ArrowRight size={18} />
               </button>
             </Link>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+            style={{ marginBottom: 64, textAlign: 'center' }}
+          >
+            <div style={{
+              display: 'inline-block',
+              background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
+              borderRadius: 12, padding: '12px 24px',
+            }}>
+              <p style={{ color: '#10B981', fontSize: '0.9rem', fontWeight: 500, marginBottom: 8 }}>
+                📱 For blazing fast uploads & offline working:
+              </p>
+              <button className="btn btn-success btn-sm" style={{ gap: 6 }} onClick={handleInstallClick}>
+                <Download size={14} /> Install Offline App
+              </button>
+            </div>
           </motion.div>
 
           {/* Stats */}

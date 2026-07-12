@@ -97,7 +97,7 @@ export default function UploadPage() {
 
       // 1. Process files locally and update UI
       const updatedFiles = [...files];
-      const CONCURRENCY_LIMIT = 3;
+      const CONCURRENCY_LIMIT = 2;
 
       for (let i = 0; i < updatedFiles.length; i += CONCURRENCY_LIMIT) {
         const chunk = updatedFiles.slice(i, i + CONCURRENCY_LIMIT);
@@ -105,6 +105,9 @@ export default function UploadPage() {
         // Mark chunk as processing
         chunk.forEach(f => f.status = 'processing');
         setFiles([...updatedFiles]);
+
+        // Yield back to main thread to allow UI to update and prevent freezing
+        await new Promise(resolve => setTimeout(resolve, 150));
 
         await Promise.all(chunk.map(async (fileItem, indexInChunk) => {
           const globalIndex = i + indexInChunk;
