@@ -33,7 +33,7 @@ export async function processImageLocally(
     }
 
     const config: Config = {
-      model: 'small', // small model ~40MB
+      model: 'isnet_quint8', // small model ~40MB
       progress: (key: string, current: number, total: number) => {
         if (onProgress && total > 0) {
           // key can be 'fetch:isnet_quint8.onnx' or 'compute:inference'
