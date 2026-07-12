@@ -61,7 +61,7 @@ export const uploadApi = {
   jobs: (page = 1) => api.get(`/api/upload/jobs?page=${page}`),
   jobStatus: (id: string) => api.get(`/api/upload/job/${id}`),
   downloadUrl: (id: string) => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('pp_token') : null;
     return `${API_URL}/api/upload/download/${id}${token ? '?token=' + token : ''}`;
   },
   guestUpload: (file: File) => {
