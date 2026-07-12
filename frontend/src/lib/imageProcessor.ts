@@ -1,5 +1,3 @@
-import type { Config } from '@imgly/background-removal';
-
 export const MAX_SIZE_MB = 10;
 export const MAX_SIZE_KB = 20;
 
@@ -7,28 +5,6 @@ export interface ProcessingOptions {
   width: number;
   height: number;
   maxSizeKb: number;
-}
-
-let isPreloading = false;
-export async function preloadAI(onProgress?: (pct: number) => void) {
-  if (isPreloading) return;
-  isPreloading = true;
-  try {
-    const { preload } = await import('@imgly/background-removal');
-    await preload({
-      model: 'isnet_quint8',
-      progress: (key: string, current: number, total: number) => {
-        if (onProgress && total > 0 && key.startsWith('fetch')) {
-          onProgress(Math.round((current / total) * 100));
-        }
-      }
-    });
-    console.log('AI Model preloaded successfully');
-  } catch (e) {
-    console.error('Failed to preload AI Model', e);
-  } finally {
-    isPreloading = false;
-  }
 }
 
 /**
@@ -49,6 +25,7 @@ export const validateImage = (file: File): { valid: boolean; error?: string } =>
 
 /**
  * Compresses an image strictly maintaining dimensions and reducing quality to meet max size.
+ * This runs locally in milliseconds and drastically reduces upload bandwidth.
  */
 export async function processImageLocally(
   file: File,
@@ -56,35 +33,9 @@ export async function processImageLocally(
   onProgress?: (status: string, progressPct: number) => void
 ): Promise<File> {
   try {
-    // 1. Remove background using AI locally
-    if (onProgress) {
-      onProgress('Downloading AI (First time only)...', 0);
-    }
+    if (onProgress) onProgress('Optimizing resolution...', 0);
 
-    const { removeBackground } = await import('@imgly/background-removal');
-
-    const config: Config = {
-      model: 'isnet_quint8', // small model ~40MB
-      progress: (key: string, current: number, total: number) => {
-        if (onProgress && total > 0) {
-          const pct = Math.round((current / total) * 100);
-          if (key.startsWith('fetch')) {
-            onProgress(`Downloading AI Model (${pct}%) - First time only`, pct);
-          } else if (key.startsWith('compute')) {
-            onProgress(`Removing background (${pct}%)`, pct);
-          }
-        }
-      },
-    };
-
-    const bgRemovedBlob = await removeBackground(file, config);
-
-    // 2. Draw strictly to exact target dimensions
-    if (onProgress) {
-      onProgress('Adjusting resolution and layout...', 100);
-    }
-
-    const bitmap = await createImageBitmap(bgRemovedBlob);
+    const bitmap = await createImageBitmap(file);
     const canvas = document.createElement('canvas');
     canvas.width = options.width;
     canvas.height = options.height;
@@ -92,7 +43,7 @@ export async function processImageLocally(
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Failed to get canvas context');
     
-    // Fill with white background
+    // Fill with white background just in case it's transparent
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -103,13 +54,10 @@ export async function processImageLocally(
     const x = (canvas.width - drawW) / 2;
     const y = (canvas.height - drawH) / 2;
     
-    // Draw the image on top
+    // Draw the image
     ctx.drawImage(bitmap, x, y, drawW, drawH);
 
-    // 3. Compress quality to meet strictly < targetSizeKb
-    if (onProgress) {
-      onProgress('Compressing file size...', 100);
-    }
+    if (onProgress) onProgress('Compressing file size...', 50);
 
     let minQ = 0.0;
     let maxQ = 1.0;
@@ -137,12 +85,13 @@ export async function processImageLocally(
       attempts++;
     }
 
-    // Fallback if we couldn't hit the target size even at the lowest test
     if (!bestBlob) {
       bestBlob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b) => b ? resolve(b) : reject(), 'image/jpeg', 0.1);
       });
     }
+
+    if (onProgress) onProgress('Optimized successfully!', 100);
 
     const finalFile = new File([bestBlob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
       type: 'image/jpeg',
