@@ -8,6 +8,7 @@ import {
   Loader2, FileImage, Users
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
+import { processImageLocally } from '@/lib/imageProcessor';
 import toast from 'react-hot-toast';
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ function GuestUploadWidget() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -85,24 +87,25 @@ function GuestUploadWidget() {
   const handleProcess = async () => {
     if (!file) return;
     setLoading(true);
+    setProgressMsg('Initializing AI model...');
     try {
-      const res = await uploadApi.guestUpload(file);
-      const blob = new Blob([res.data], { type: 'image/jpeg' });
-      const url = URL.createObjectURL(blob);
+      // 100% Free Client-Side Processing!
+      const processedFile = await processImageLocally(file, (msg) => setProgressMsg(msg));
+      
+      const url = URL.createObjectURL(processedFile);
       setResultUrl(url);
-      toast.success('✅ Photo processed! Download below.');
+      toast.success('✅ Photo processed flawlessly!');
     } catch (err: any) {
-      const msg = err.response?.status === 429
-        ? 'Free limit reached (5/hour). Register for unlimited access!'
-        : 'Processing failed — please try a different image.';
-      toast.error(msg);
+      console.error(err);
+      toast.error('Processing failed — please try a different image.');
     } finally {
       setLoading(false);
+      setProgressMsg(null);
     }
   };
 
   const reset = () => {
-    setFile(null); setPreview(null); setResultUrl(null);
+    setFile(null); setPreview(null); setResultUrl(null); setProgressMsg(null);
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -192,8 +195,8 @@ function GuestUploadWidget() {
             style={{ gap: 8, fontSize: '0.95rem' }}
           >
             {loading
-              ? <><Loader2 size={16} className="animate-spin" /> Processing photo...</>
-              : <><Zap size={16} /> Process Photo Free</>
+              ? <><Loader2 size={16} className="animate-spin" /> {progressMsg || 'Processing photo...'}</>
+              : <><Zap size={16} /> Process Photo with AI (Free)</>
             }
           </motion.button>
 

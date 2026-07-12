@@ -10,8 +10,7 @@ const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/upload');
 const adminRoutes = require('./routes/admin');
 const { seedAdmin } = require('./db/seed');
-// Initialize queue workers
-require('./services/queueWorker');
+// Initialize queue workers - Removed since processing is instantaneous
 
 const app = express();
 const PORT = process.env.PORT || 5000;

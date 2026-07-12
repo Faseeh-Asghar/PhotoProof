@@ -1,6 +1,7 @@
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_dummy_key';
+const resend = new Resend(RESEND_API_KEY);
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@photoproof.app';
 const APP_NAME = 'PhotoProof';
 const APP_URL = process.env.FRONTEND_URL || 'https://photoproof.app';

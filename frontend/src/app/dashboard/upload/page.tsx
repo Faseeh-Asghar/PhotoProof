@@ -3,10 +3,10 @@ import { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Upload, X, CheckCircle, AlertCircle, Download,
-  ImageIcon, Loader2, FileImage, Trash2, ZapIcon
+  Upload, X, CheckCircle, AlertCircle, Download, FileImage, Trash2, Zap, Loader2, ImageIcon
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
+import { processImageLocally } from '@/lib/imageProcessor';
 import toast from 'react-hot-toast';
 
 interface FileItem {
@@ -65,32 +65,6 @@ export default function UploadPage() {
     setJob(null);
   };
 
-  const startPolling = (jobId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await uploadApi.jobStatus(jobId);
-        const data = res.data;
-        setJob(data);
-
-        if (data.status === 'completed' || data.status === 'partial' || data.status === 'failed') {
-          clearInterval(interval);
-          setPollInterval(null);
-          setUploading(false);
-          if (data.status === 'completed') {
-            toast.success(`✅ All ${data.processedFiles} photos processed! Ready to download.`);
-          } else if (data.status === 'partial') {
-            toast(`⚠️ ${data.processedFiles} processed, ${data.failedFiles} failed.`, { icon: '⚠️' });
-          } else {
-            toast.error('Processing failed. Please try again.');
-          }
-        }
-      } catch (err) {
-        console.error('Polling error:', err);
-      }
-    }, 2500);
-    setPollInterval(interval);
-  };
-
   const handleUpload = async () => {
     if (files.length === 0) return;
     setUploading(true);
@@ -98,25 +72,51 @@ export default function UploadPage() {
     setUploadPct(0);
 
     try {
-      const res = await uploadApi.batch(files.map((f) => f.file), setUploadPct);
-      const { jobId } = res.data;
+      toast.success('Starting local AI processing...');
+      
+      const processedFiles: File[] = [];
+      let successCount = 0;
+      let failCount = 0;
+
+      // 1. Process files locally
+      for (let i = 0; i < files.length; i++) {
+        setUploadPct(Math.round(((i) / files.length) * 50)); // 0 to 50% for local processing
+        try {
+          const pf = await processImageLocally(files[i].file);
+          processedFiles.push(pf);
+          successCount++;
+        } catch (e) {
+          console.error('Failed to process', files[i].file.name, e);
+          failCount++;
+        }
+      }
+
+      if (processedFiles.length === 0) {
+        throw new Error('All files failed local processing.');
+      }
+
+      // 2. Upload processed files (50% to 100%)
+      setUploadPct(50);
+      const res = await uploadApi.batch(processedFiles, (pct) => setUploadPct(50 + Math.round(pct / 2)));
+      
+      const { jobId, downloadUrl } = res.data;
 
       setJob({
         jobId,
-        status: 'processing',
+        status: 'completed',
         totalFiles: files.length,
-        processedFiles: 0,
-        failedFiles: 0,
-        progress: 0,
-        downloadUrl: null,
+        processedFiles: successCount,
+        failedFiles: failCount,
+        progress: 100,
+        downloadUrl: downloadUrl || null,
       });
 
-      toast.success('Photos uploaded! Processing started...');
-      startPolling(jobId);
+      toast.success(`✅ All ${successCount} photos processed & zipped!`);
     } catch (err: any) {
-      setUploading(false);
-      const msg = err.response?.data?.error || 'Upload failed. Please try again.';
+      const msg = err.response?.data?.error || err.message || 'Upload failed. Please try again.';
       toast.error(msg);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -148,7 +148,7 @@ export default function UploadPage() {
             borderRadius: 10, padding: '10px 20px',
             display: 'flex', gap: 8, alignItems: 'center',
           }}>
-            <ZapIcon size={13} color="#818CF8" />
+            <Zap size={13} color="#818CF8" />
             <span style={{ color: '#64748B', fontSize: '0.8rem' }}>{s.label}:</span>
             <span style={{ color: '#F1F5F9', fontSize: '0.85rem', fontWeight: 600 }}>{s.value}</span>
           </div>
@@ -278,7 +278,9 @@ export default function UploadPage() {
       {uploading && uploadPct < 100 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ color: '#64748B', fontSize: '0.85rem' }}>Uploading files...</span>
+            <span style={{ color: '#64748B', fontSize: '0.85rem' }}>
+              {uploadPct < 50 ? 'Removing background (AI)...' : 'Uploading processed files...'}
+            </span>
             <span style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 600 }}>{uploadPct}%</span>
           </div>
           <div className="progress-track" style={{ height: 8 }}>

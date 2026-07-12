@@ -3,8 +3,10 @@ const path = require('path');
 const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../db');
-const { imageQueue, UPLOAD_DIR, ZIPS_DIR } = require('../services/queueWorker');
-const { validateImage } = require('../services/imageProcessor');
+const archiver = require('archiver');
+
+const UPLOAD_DIR = path.join(__dirname, '../../uploads');
+const ZIPS_DIR = path.join(__dirname, '../../zips');
 
 // ─── Multer config ────────────────────────────────────────────────────────────
 const storage = multer.memoryStorage();
@@ -27,7 +29,6 @@ const upload = multer({
   },
 });
 
-// ─── Upload batch ─────────────────────────────────────────────────────────────
 const uploadBatch = async (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: 'No files uploaded' });
@@ -49,132 +50,52 @@ const uploadBatch = async (req, res) => {
   const jobId = uuidv4();
 
   try {
-    // Create job record
+    // Make sure dirs exist
+    await fs.mkdir(ZIPS_DIR, { recursive: true });
+
+    // Instantly generate ZIP since files are already processed by the frontend
+    const zipPath = path.join(ZIPS_DIR, `${jobId}.zip`);
+    const output = require('fs').createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 6 } });
+
+    archive.pipe(output);
+
+    filesToProcess.forEach((file) => {
+      // Append file to archive
+      archive.append(file.buffer, { name: file.originalname });
+    });
+
+    await archive.finalize();
+
+    // Create completed job record
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+
     await query(
-      `INSERT INTO jobs (id, user_id, status, total_files) VALUES ($1, $2, 'queued', $3)`,
-      [jobId, user.id, filesToProcess.length]
+      `INSERT INTO jobs (id, user_id, status, total_files, processed_files, failed_files, zip_url, zip_expires_at) 
+       VALUES ($1, $2, 'completed', $3, $3, 0, $4, $5)`,
+      [jobId, user.id, filesToProcess.length, `/api/upload/download/${jobId}`, expiresAt]
     );
 
-    // Save files and create job_file records
-    const jobUploadDir = path.join(UPLOAD_DIR, jobId);
-    await fs.mkdir(jobUploadDir, { recursive: true });
-
-    const jobFiles = [];
-    const validationErrors = [];
-
-    for (const file of filesToProcess) {
-      const { valid, errors } = await validateImage(file.buffer, file.originalname);
-      if (!valid) {
-        validationErrors.push(...errors);
-        continue;
-      }
-
-      const fileId = uuidv4();
-      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-      const storedName = `${fileId}${ext}`;
-      const outputName = `processed_${path.basename(file.originalname, ext)}.jpg`;
-      const inputPath = path.join(jobUploadDir, storedName);
-
-      await fs.writeFile(inputPath, file.buffer);
-
-      await query(
-        `INSERT INTO job_files (id, job_id, original_name, stored_name, processed_name, status, file_size_bytes)
-         VALUES ($1, $2, $3, $4, $5, 'queued', $6)`,
-        [fileId, jobId, file.originalname, storedName, outputName, file.buffer.length]
-      );
-
-      jobFiles.push({ fileId, inputPath, outputName });
-    }
-
-    // Update total if some were invalid
-    if (validationErrors.length > 0) {
-      await query(
-        `UPDATE jobs SET total_files = $1, failed_files = $2 WHERE id = $3`,
-        [jobFiles.length, validationErrors.length, jobId]
-      );
-    }
-
-    if (jobFiles.length === 0) {
-      await query(`UPDATE jobs SET status = 'failed', error_message = $1 WHERE id = $2`, [
-        'All files failed validation',
-        jobId,
-      ]);
-      return res.status(400).json({ error: 'All files failed validation', details: validationErrors });
-    }
-
-    // Set job to processing
-    await query(`UPDATE jobs SET status = 'processing' WHERE id = $1`, [jobId]);
-
-    // Queue all image processing jobs
-    const queueJobs = jobFiles.map((f) =>
-      imageQueue.add('process-image', {
-        fileId: f.fileId,
-        jobId,
-        inputPath: f.inputPath,
-        outputFileName: f.outputName,
-      })
+    // Update user quota usage
+    await query(
+      `UPDATE users SET images_processed = images_processed + $1 WHERE id = $2`,
+      [filesToProcess.length, user.id]
     );
 
-    await Promise.all(queueJobs);
-
-    // Queue finalization job (runs after all process-image jobs)
-    // We use a delayed job that polls — or we use a separate mechanism
-    // For simplicity, finalize-job is triggered after all images are done (via a callback approach)
-    scheduleFinalization(jobId, jobFiles.length);
-
-    return res.status(202).json({
+    return res.status(200).json({
       jobId,
-      status: 'processing',
-      totalFiles: jobFiles.length,
-      skipped: validationErrors.length,
-      validationErrors: validationErrors.slice(0, 10),
-      message: `Processing ${jobFiles.length} image(s). Check status at /api/upload/job/${jobId}`,
+      status: 'completed',
+      totalFiles: filesToProcess.length,
+      downloadUrl: `/api/upload/download/${jobId}`,
+      message: `Successfully processed ${filesToProcess.length} images.`,
     });
   } catch (err) {
     console.error('Upload batch error:', err);
-    await query(`UPDATE jobs SET status = 'failed', error_message = $1 WHERE id = $2`, [
-      err.message,
-      jobId,
-    ]).catch(() => {});
     return res.status(500).json({ error: 'Upload failed. Please try again.' });
   }
 };
 
-// Poll-based finalization: check every 3 seconds if all files are done
-function scheduleFinalization(jobId, totalFiles) {
-  const maxWait = 10 * 60 * 1000; // 10 minutes max
-  const interval = 3000;
-  const startTime = Date.now();
-
-  const timer = setInterval(async () => {
-    try {
-      if (Date.now() - startTime > maxWait) {
-        clearInterval(timer);
-        imageQueue.add('finalize-job', { jobId });
-        return;
-      }
-
-      const result = await query(
-        `SELECT processed_files, failed_files FROM jobs WHERE id = $1`,
-        [jobId]
-      );
-
-      if (result.rows.length === 0) {
-        clearInterval(timer);
-        return;
-      }
-
-      const { processed_files, failed_files } = result.rows[0];
-      if (processed_files + failed_files >= totalFiles) {
-        clearInterval(timer);
-        imageQueue.add('finalize-job', { jobId });
-      }
-    } catch (err) {
-      clearInterval(timer);
-      imageQueue.add('finalize-job', { jobId });
-    }
-  }, interval);
-}
 
 // ─── Get job status ───────────────────────────────────────────────────────────
 const getJobStatus = async (req, res) => {
@@ -298,34 +219,18 @@ const downloadZip = async (req, res) => {
 };
 
 
-// ─── Guest Upload (no auth, 1 image, returns processed file directly) ─────────
 const guestUpload = async (req, res) => {
+  // Guest upload is now entirely processed on the client side!
+  // The client side shouldn't be calling this anymore, it just does it locally.
+  // We keep this route just in case someone hits it, but it just echoes back the image.
   if (!req.file) {
-    return res.status(400).json({ error: 'No image uploaded. Please select one image file.' });
+    return res.status(400).json({ error: 'No image uploaded.' });
   }
-
-  try {
-    const { processImage, validateImage } = require('../services/imageProcessor');
-
-    // Validate first — give clear error for bad files
-    const { valid, errors: valErrors } = await validateImage(req.file.buffer, req.file.originalname);
-    if (!valid) {
-      return res.status(400).json({ error: valErrors[0] || 'Invalid image file.' });
-    }
-
-    // Process in-memory — no DB, no queue
-    const outputBuffer = await processImage(req.file.buffer);
-
-    const outputName = `photoproof_guest_${Date.now()}.jpg`;
-
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Content-Disposition', `attachment; filename="${outputName}"`);
-    res.setHeader('Content-Length', outputBuffer.length);
-    res.send(outputBuffer);
-  } catch (err) {
-    console.error('Guest upload error:', err.message, err.stack);
-    return res.status(500).json({ error: 'Processing failed. Please try a different image.' });
-  }
+  
+  res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Content-Disposition', `attachment; filename="photoproof_guest_${Date.now()}.jpg"`);
+  res.setHeader('Content-Length', req.file.buffer.length);
+  res.send(req.file.buffer);
 };
 
 module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload };
