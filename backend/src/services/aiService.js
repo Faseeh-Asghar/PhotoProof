@@ -13,7 +13,7 @@ async function processImageBackground(imageBuffer) {
     
     // Process the image. We use the small model to save memory and ensure fast execution.
     const resultBlob = await removeBackground(blob, {
-      model: 'isnet_quint8', // The fastest and smallest model (~40MB)
+      model: 'medium', // Note: imgly-node expects 'small' | 'medium' | 'large'
       output: {
         format: 'image/png',
         quality: 1
