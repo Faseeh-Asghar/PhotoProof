@@ -79,9 +79,11 @@ export const uploadApi = {
 export const adminApi = {
   stats: () => api.get('/api/admin/stats'),
   users: (params?: any) => api.get('/api/admin/users', { params }),
-  approveUser: (id: string, data?: any) => api.patch(`/api/admin/users/${id}/approve`, data),
-  suspendUser: (id: string, reason?: string) => api.patch(`/api/admin/users/${id}/suspend`, { reason }),
+  approveUser: (id: string, data: { quotaLimit: number, sendEmail?: boolean }) => api.patch(`/api/admin/users/${id}/approve`, data),
+  suspendUser: (id: string, reason: string) => api.patch(`/api/admin/users/${id}/suspend`, { reason }),
   reactivateUser: (id: string) => api.patch(`/api/admin/users/${id}/reactivate`),
   updateQuota: (id: string, quotaLimit: number) => api.patch(`/api/admin/users/${id}/quota`, { quotaLimit }),
+  updateRole: (id: string, role: string) => api.patch(`/api/admin/users/${id}/role`, { role }),
+  updatePassword: (id: string, password: string) => api.patch(`/api/admin/users/${id}/password`, { password }),
   jobs: (params?: any) => api.get('/api/admin/jobs', { params }),
 };

@@ -99,9 +99,10 @@ export default function RegisterPage() {
               background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.25)',
               borderRadius: 12, padding: 20, marginBottom: 32, textAlign: 'center',
             }}>
-              <p style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 700, marginBottom: 4 }}>Payment Contact</p>
-              <p style={{ color: '#F1F5F9', fontWeight: 600, marginTop: 8 }}>faseehasghar167@gmail.com</p>
-              <p style={{ color: '#64748B', fontSize: '0.8rem', marginTop: 4 }}>Amount: PKR 300 / month</p>
+              <p style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 700, marginBottom: 4 }}>Payment Contact Info</p>
+              <p style={{ color: '#F1F5F9', fontWeight: 600, marginTop: 8 }}>Phone Number: 0306 9136380</p>
+              <p style={{ color: '#F1F5F9', fontWeight: 600, marginTop: 4 }}>JazzCash Account: 0303 0934664</p>
+              <p style={{ color: '#64748B', fontSize: '0.8rem', marginTop: 12 }}>Amount: PKR 300 / month</p>
             </div>
 
             <Link href="/login">

@@ -3,7 +3,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Upload, X, CheckCircle, AlertCircle, Download, FileImage, Trash2, Zap, Loader2, ImageIcon
+  Upload, X, CheckCircle, AlertCircle, Download, FileImage, Trash2, Zap, Loader2, ImageIcon, Image as ImageIcon2
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
 import { processImageLocally } from '@/lib/imageProcessor';
@@ -13,7 +13,9 @@ interface FileItem {
   id: string;
   file: File;
   preview: string;
-  status: 'ready' | 'uploading' | 'done' | 'error';
+  status: 'ready' | 'processing' | 'done' | 'error';
+  processedFile?: File;
+  processedPreview?: string;
 }
 
 interface JobResult {
@@ -32,7 +34,6 @@ export default function UploadPage() {
   const [uploadPct, setUploadPct] = useState(0);
   const [statusMsg, setStatusMsg] = useState('Processing...');
   const [job, setJob] = useState<JobResult | null>(null);
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.bmp'] },
@@ -49,19 +50,26 @@ export default function UploadPage() {
         status: 'ready',
       }));
       setFiles((prev) => [...prev, ...newFiles].slice(0, 100));
+      setJob(null);
     },
   });
 
   const removeFile = (id: string) => {
     setFiles((prev) => {
       const f = prev.find((x) => x.id === id);
-      if (f) URL.revokeObjectURL(f.preview);
+      if (f) {
+        URL.revokeObjectURL(f.preview);
+        if (f.processedPreview) URL.revokeObjectURL(f.processedPreview);
+      }
       return prev.filter((x) => x.id !== id);
     });
   };
 
   const clearAll = () => {
-    files.forEach((f) => URL.revokeObjectURL(f.preview));
+    files.forEach((f) => {
+      URL.revokeObjectURL(f.preview);
+      if (f.processedPreview) URL.revokeObjectURL(f.processedPreview);
+    });
     setFiles([]);
     setJob(null);
   };
@@ -73,35 +81,44 @@ export default function UploadPage() {
     setUploadPct(0);
 
     try {
-      toast.success('Preparing files for upload...');
+      toast.success('Processing images...');
       
-      const processedFiles: File[] = [];
+      const pFiles: File[] = [];
       let successCount = 0;
       let failCount = 0;
 
-      // 1. Process files locally
-      for (let i = 0; i < files.length; i++) {
-        setUploadPct(Math.round(((i) / files.length) * 50)); // 0 to 50% for local processing
+      // 1. Process files locally and update UI
+      const updatedFiles = [...files];
+      for (let i = 0; i < updatedFiles.length; i++) {
+        setUploadPct(Math.round(((i) / updatedFiles.length) * 50)); 
+        updatedFiles[i].status = 'processing';
+        setFiles([...updatedFiles]);
+
         try {
-          const pf = await processImageLocally(files[i].file, (status, pct) => {
-            setStatusMsg(`Photo ${i + 1}/${files.length}: ${status}`);
+          const pf = await processImageLocally(updatedFiles[i].file, (status, pct) => {
+            setStatusMsg(`Photo ${i + 1}/${updatedFiles.length}: ${status}`);
           });
-          processedFiles.push(pf);
+          pFiles.push(pf);
+          updatedFiles[i].processedFile = pf;
+          updatedFiles[i].processedPreview = URL.createObjectURL(pf);
+          updatedFiles[i].status = 'done';
           successCount++;
         } catch (e) {
-          console.error('Failed to process', files[i].file.name, e);
+          console.error('Failed to process', updatedFiles[i].file.name, e);
+          updatedFiles[i].status = 'error';
           failCount++;
         }
+        setFiles([...updatedFiles]);
       }
 
-      if (processedFiles.length === 0) {
+      if (pFiles.length === 0) {
         throw new Error('All files failed local processing.');
       }
 
       // 2. Upload processed files (50% to 100%)
-      setStatusMsg('Uploading zipped files to server...');
+      setStatusMsg('Uploading to server for job tracking & ZIP creation...');
       setUploadPct(50);
-      const res = await uploadApi.batch(processedFiles, (pct) => setUploadPct(50 + Math.round(pct / 2)));
+      const res = await uploadApi.batch(pFiles, (pct) => setUploadPct(50 + Math.round(pct / 2)));
       
       const { jobId, downloadUrl } = res.data;
 
@@ -115,13 +132,26 @@ export default function UploadPage() {
         downloadUrl: downloadUrl || null,
       });
 
-      toast.success(`✅ All ${successCount} photos processed & zipped!`);
+      toast.success(`✅ All ${successCount} photos processed!`);
     } catch (err: any) {
-      const msg = err.response?.data?.error || err.message || 'Upload failed. Please try again.';
+      const msg = err.response?.data?.error || err.message || 'Processing failed. Please try again.';
       toast.error(msg);
     } finally {
       setUploading(false);
     }
+  };
+
+  const downloadAllJpegs = () => {
+    files.forEach(f => {
+      if (f.status === 'done' && f.processedPreview && f.processedFile) {
+        const a = document.createElement('a');
+        a.href = f.processedPreview;
+        a.download = f.processedFile.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    });
   };
 
   const totalSizeMB = (files.reduce((acc, f) => acc + f.file.size, 0) / 1024 / 1024).toFixed(1);
@@ -213,10 +243,10 @@ export default function UploadPage() {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-              gap: 12,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 16,
               marginBottom: 28,
-              maxHeight: 320,
+              maxHeight: 400,
               overflowY: 'auto',
               padding: 4,
             }}>
@@ -226,33 +256,70 @@ export default function UploadPage() {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', aspectRatio: '3/4', background: '#141B2D' }}
+                  style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: '#141B2D', border: '1px solid rgba(255,255,255,0.06)' }}
                 >
-                  <img
-                    src={f.preview}
-                    alt={f.file.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <button
-                    onClick={() => removeFile(f.id)}
-                    style={{
-                      position: 'absolute', top: 4, right: 4,
-                      background: 'rgba(0,0,0,0.7)', border: 'none',
-                      borderRadius: '50%', width: 22, height: 22,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', color: 'white',
-                    }}
-                  >
-                    <X size={12} />
-                  </button>
-                  <div style={{
-                    position: 'absolute', bottom: 0, left: 0, right: 0,
-                    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                    padding: '8px 4px 4px',
-                  }}>
-                    <p style={{ color: 'white', fontSize: '0.65rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ aspectRatio: '3/4', position: 'relative' }}>
+                    <img
+                      src={f.processedPreview || f.preview}
+                      alt={f.file.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    
+                    {/* Status Overlays */}
+                    {f.status === 'processing' && (
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Loader2 className="animate-spin text-white" size={24} />
+                      </div>
+                    )}
+                    {f.status === 'done' && (
+                      <div style={{ position: 'absolute', top: 4, left: 4, background: '#10B981', borderRadius: '50%', padding: 2 }}>
+                        <CheckCircle size={14} color="white" />
+                      </div>
+                    )}
+                    {f.status === 'error' && (
+                      <div style={{ position: 'absolute', top: 4, left: 4, background: '#EF4444', borderRadius: '50%', padding: 2 }}>
+                        <AlertCircle size={14} color="white" />
+                      </div>
+                    )}
+
+                    {!f.processedPreview && (
+                      <button
+                        onClick={() => removeFile(f.id)}
+                        style={{
+                          position: 'absolute', top: 4, right: 4,
+                          background: 'rgba(0,0,0,0.7)', border: 'none',
+                          borderRadius: '50%', width: 22, height: 22,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', color: 'white',
+                        }}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Info Footer */}
+                  <div style={{ padding: '8px', background: '#0D1322' }}>
+                    <p style={{ color: '#F1F5F9', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
                       {f.file.name}
                     </p>
+                    {f.processedFile ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#10B981', fontSize: '0.7rem', fontWeight: 600 }}>
+                          {(f.processedFile.size / 1024).toFixed(1)} KB
+                        </span>
+                        <span style={{ color: '#94A3B8', fontSize: '0.7rem' }}>
+                          600x800
+                        </span>
+                        <a href={f.processedPreview} download={f.processedFile.name} title="Download individual JPEG">
+                          <Download size={14} color="#818CF8" style={{ cursor: 'pointer' }} />
+                        </a>
+                      </div>
+                    ) : (
+                      <span style={{ color: '#64748B', fontSize: '0.7rem' }}>
+                        Original: {(f.file.size / 1024).toFixed(1)} KB
+                      </span>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -261,7 +328,7 @@ export default function UploadPage() {
         )}
       </AnimatePresence>
 
-      {/* Upload button */}
+      {/* Upload/Process button */}
       {files.length > 0 && !job && (
         <motion.button
           className="btn btn-primary btn-lg btn-full"
@@ -273,7 +340,7 @@ export default function UploadPage() {
           {uploading ? (
             <><Loader2 size={18} className="animate-spin" /> {statusMsg} ({uploadPct}%)</>
           ) : (
-            <><Upload size={18} /> Process {files.length} Photo{files.length !== 1 ? 's' : ''}</>
+            <><ImageIcon2 size={18} /> Process & Generate Previews</>
           )}
         </motion.button>
       )}
@@ -293,7 +360,7 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* Job Status */}
+      {/* Job Status & Downloads */}
       <AnimatePresence>
         {job && (
           <motion.div
@@ -303,58 +370,29 @@ export default function UploadPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
-                <h4 style={{ marginBottom: 4 }}>Processing Job</h4>
-                <p style={{ color: '#64748B', fontSize: '0.82rem', fontFamily: 'monospace' }}>
-                  #{job.jobId?.slice(0, 12)}...
+                <h4 style={{ marginBottom: 4 }}>Processing Complete!</h4>
+                <p style={{ color: '#64748B', fontSize: '0.82rem' }}>
+                  Your photos are ready. You can download them individually from the previews above, or in a batch below.
                 </p>
               </div>
-              <span className={`badge badge-${job.status}`}>{job.status}</span>
+              <CheckCircle size={28} color="#10B981" />
             </div>
 
-            <div style={{ display: 'flex', gap: 32, marginBottom: 20 }}>
-              <div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.6rem', color: '#10B981' }}>
-                  {job.processedFiles}
-                </div>
-                <div style={{ color: '#64748B', fontSize: '0.8rem' }}>Processed</div>
-              </div>
-              <div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.6rem', color: '#EF4444' }}>
-                  {job.failedFiles}
-                </div>
-                <div style={{ color: '#64748B', fontSize: '0.8rem' }}>Failed</div>
-              </div>
-              <div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.6rem', color: '#F1F5F9' }}>
-                  {job.totalFiles}
-                </div>
-                <div style={{ color: '#64748B', fontSize: '0.8rem' }}>Total</div>
-              </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <button onClick={downloadAllJpegs} className="btn btn-primary" style={{ flex: 1, minWidth: 200, gap: 8 }}>
+                <ImageIcon2 size={18} />
+                Download Direct JPEGs
+              </button>
+              
+              {job.downloadUrl && (
+                <a href={uploadApi.downloadUrl(job.jobId)} download style={{ flex: 1, minWidth: 200, display: 'block', textDecoration: 'none' }}>
+                  <button className="btn btn-ghost btn-full" style={{ gap: 8, height: '100%' }}>
+                    <Download size={18} />
+                    Download ZIP Archive
+                  </button>
+                </a>
+              )}
             </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <div className="progress-track" style={{ height: 10 }}>
-                <div className="progress-fill" style={{ width: `${job.progress}%` }} />
-              </div>
-              <p style={{ color: '#64748B', fontSize: '0.8rem', marginTop: 8 }}>{job.progress}% complete</p>
-            </div>
-
-            {(job.status === 'completed' || job.status === 'partial') && job.downloadUrl && (
-              <a href={uploadApi.downloadUrl(job.jobId)} download>
-                <button className="btn btn-success btn-full" style={{ gap: 8 }}>
-                  <Download size={18} />
-                  Download Processed Photo{files.length === 1 ? '' : 's (ZIP)'}
-                </button>
-              </a>
-            )}
-
-            {job.status === 'processing' || job.status === 'queued' ? (
-              <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center z-10 border border-gray-700/50">
-                <Loader2 className="w-10 h-10 text-white animate-spin mb-4" />
-                <p className="text-white font-medium mb-2">{statusMsg}</p>
-                <div className="w-48 h-1.5 bg-gray-800 rounded-full overflow-hidden"></div>
-              </div>
-            ) : null}
           </motion.div>
         )}
       </AnimatePresence>

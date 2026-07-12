@@ -169,15 +169,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       {/* Desktop Sidebar */}
-      <div style={{ display: 'none' }} className="desktop-sidebar">
+      <div className="desktop-sidebar">
         <Sidebar />
-      </div>
-
-      {/* Always visible on desktop */}
-      <div style={{ display: 'flex' }}>
-        <div style={{ display: 'block' }}>
-          <Sidebar />
-        </div>
       </div>
 
       {/* Mobile overlay */}
@@ -195,8 +188,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowY: 'auto' }}>
         {/* Mobile topbar */}
-        <div style={{
-          display: 'none',
+        <div className="mobile-topbar" style={{
           padding: '12px 20px',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           background: '#0D1322',

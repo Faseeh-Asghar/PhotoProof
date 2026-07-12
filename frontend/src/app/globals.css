@@ -362,4 +362,11 @@ a:hover { color: var(--text-primary); }
   .card { padding: var(--space-4); }
   h1 { font-size: 2rem; }
   h2 { font-size: 1.5rem; }
+  
+  .desktop-sidebar { display: none !important; }
+  .mobile-topbar { display: flex !important; }
+}
+@media (min-width: 769px) {
+  .desktop-sidebar { display: flex !important; }
+  .mobile-topbar { display: none !important; }
 }

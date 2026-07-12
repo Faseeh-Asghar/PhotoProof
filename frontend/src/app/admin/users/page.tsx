@@ -24,6 +24,7 @@ interface User {
   approved_at: string;
   approved_by_name: string;
   total_jobs: number;
+  role: string;
 }
 
 const STATUS_OPTIONS = ['all', 'pending_approval', 'active', 'suspended', 'pending_payment'];
@@ -39,6 +40,7 @@ export default function AdminUsersPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [quotaEdit, setQuotaEdit] = useState<{ id: string; value: number } | null>(null);
+  const [passwordEdit, setPasswordEdit] = useState<{ id: string; value: string } | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -65,7 +67,7 @@ export default function AdminUsersPage() {
   const handleApprove = async (id: string, name: string) => {
     setActionLoading(id + '-approve');
     try {
-      await adminApi.approveUser(id);
+      await adminApi.approveUser(id, { quotaLimit: 500, sendEmail: true });
       toast.success(`✅ ${name} has been approved and activated`);
       fetchUsers();
     } catch (err: any) {
@@ -76,10 +78,11 @@ export default function AdminUsersPage() {
   };
 
   const handleSuspend = async (id: string, name: string) => {
-    if (!confirm(`Suspend ${name}? They will lose access immediately.`)) return;
+    const reason = prompt(`Reason for suspending ${name}?`);
+    if (reason === null) return;
     setActionLoading(id + '-suspend');
     try {
-      await adminApi.suspendUser(id);
+      await adminApi.suspendUser(id, reason || 'No reason provided');
       toast.success(`User ${name} suspended`);
       fetchUsers();
     } catch {
@@ -111,6 +114,30 @@ export default function AdminUsersPage() {
       fetchUsers();
     } catch {
       toast.error('Failed to update quota');
+    }
+  };
+
+  const handlePasswordUpdate = async (id: string) => {
+    if (!passwordEdit || passwordEdit.value.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    try {
+      await adminApi.updatePassword(id, passwordEdit.value);
+      toast.success('Password updated successfully');
+      setPasswordEdit(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update password');
+    }
+  };
+
+  const handleRoleUpdate = async (id: string, newRole: string) => {
+    try {
+      await adminApi.updateRole(id, newRole);
+      toast.success(`Role updated to ${newRole}`);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update role');
     }
   };
 
@@ -283,8 +310,35 @@ export default function AdminUsersPage() {
                         )}
                       </div>
 
+                      {/* Password Editor */}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.82rem', color: '#64748B' }}>Password:</span>
+                        {passwordEdit?.id === user.id ? (
+                          <>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="New password (min 8)"
+                              value={passwordEdit.value}
+                              onChange={(e) => setPasswordEdit({ id: user.id, value: e.target.value })}
+                              style={{ width: 180, padding: '6px 12px', fontSize: '0.85rem' }}
+                            />
+                            <button className="btn btn-success btn-sm" onClick={() => handlePasswordUpdate(user.id)}>Save</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setPasswordEdit(null)}>Cancel</button>
+                          </>
+                        ) : (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setPasswordEdit({ id: user.id, value: '' })}
+                            style={{ gap: 6 }}
+                          >
+                            <Edit3 size={12} /> Reset Password
+                          </button>
+                        )}
+                      </div>
+
                       {/* Actions */}
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                         {(user.status === 'pending_approval' || user.status === 'pending_payment') && (
                           <button
                             className="btn btn-success"
@@ -316,6 +370,26 @@ export default function AdminUsersPage() {
                           >
                             {actionLoading === user.id + '-reactivate' ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={15} />}
                             Reactivate
+                          </button>
+                        )}
+                        
+                        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)', margin: '0 8px' }} />
+
+                        {user.role === 'admin' ? (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleRoleUpdate(user.id, 'user')}
+                            style={{ gap: 8 }}
+                          >
+                            Demote to User
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleRoleUpdate(user.id, 'admin')}
+                            style={{ gap: 8, color: '#818CF8', borderColor: 'rgba(129,140,248,0.3)' }}
+                          >
+                            Promote to Admin
                           </button>
                         )}
                       </div>

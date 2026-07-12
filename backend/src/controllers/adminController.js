@@ -7,7 +7,7 @@ const listUsers = async (req, res) => {
   const { status, search, page = 1, limit = 20 } = req.query;
   const offset = (page - 1) * limit;
 
-  let whereClause = "WHERE u.role != 'admin'";
+  let whereClause = "WHERE 1=1";
   const params = [];
   let paramIdx = 1;
 
@@ -236,12 +236,59 @@ const listAllJobs = async (req, res) => {
   }
 };
 
+// ─── Update user role ──────────────────────────────────────────────────────────
+const updateRole = async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+
+  if (!['admin', 'user'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+
+  try {
+    await query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+    return res.json({ message: 'Role updated successfully' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update role' });
+  }
+};
+
+// ─── Update user password ──────────────────────────────────────────────────────
+const updatePassword = async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  if (!password || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  try {
+    // Generate salt and hash
+    const salt = crypto.randomBytes(16).toString('hex');
+    crypto.pbkdf2(password, salt, 310000, 32, 'sha256', async (err, hashedPassword) => {
+      if (err) return res.status(500).json({ error: 'Password hashing failed' });
+      
+      const passwordHash = hashedPassword.toString('hex');
+      await query(
+        'UPDATE users SET password_hash = $1, password_salt = $2 WHERE id = $3',
+        [passwordHash, salt, id]
+      );
+      
+      return res.json({ message: 'Password updated successfully' });
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update password' });
+  }
+};
+
 module.exports = {
   listUsers,
   approveUser,
   suspendUser,
   reactivateUser,
   updateQuota,
+  updateRole,
+  updatePassword,
   getStats,
   listAllJobs,
 };

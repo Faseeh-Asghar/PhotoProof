@@ -16,6 +16,7 @@ function LoginForm() {
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -143,6 +144,15 @@ function LoginForm() {
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              <div style={{ textAlign: 'right', marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(true)}
+                  style={{ background: 'none', border: 'none', color: '#818CF8', fontSize: '0.8rem', cursor: 'pointer', padding: 0 }}
+                >
+                  Forgot password?
+                </button>
+              </div>
             </div>
 
             <motion.button
@@ -166,6 +176,29 @@ function LoginForm() {
           <Link href="/" style={{ color: '#475569' }}>← Back to home</Link>
         </p>
       </motion.div>
+
+      {showForgotModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 24, backdropFilter: 'blur(4px)' }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="card"
+            style={{ padding: 32, maxWidth: 400, width: '100%', textAlign: 'center' }}
+          >
+            <h2 style={{ marginBottom: 12 }}>Forgot Password?</h2>
+            <p style={{ color: '#94A3B8', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: 24 }}>
+              To reset your password, please contact the administrator directly using the details below:
+            </p>
+            <div style={{ background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.25)', borderRadius: 12, padding: 16, marginBottom: 24, textAlign: 'left' }}>
+              <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: '0.9rem', marginBottom: 8 }}>📞 Phone: <span style={{ color: '#818CF8' }}>0306 9136380</span></p>
+              <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: '0.9rem' }}>💳 JazzCash: <span style={{ color: '#818CF8' }}>0303 0934664</span></p>
+            </div>
+            <button onClick={() => setShowForgotModal(false)} className="btn btn-primary btn-full">
+              Close
+            </button>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
