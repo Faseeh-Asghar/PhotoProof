@@ -6,6 +6,16 @@ import { ImageIcon, Mail, Lock, User, CreditCard, Eye, EyeOff, CheckCircle2, Loa
 import { authApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
+const Field = ({ label, id, children, error }: any) => (
+  <div style={{ marginBottom: 20 }}>
+    <label htmlFor={id} style={{ display: 'block', marginBottom: 8, fontSize: '0.875rem', fontWeight: 500, color: '#94A3B8' }}>
+      {label}
+    </label>
+    {children}
+    {error && <p style={{ color: '#FCA5A5', fontSize: '0.8rem', marginTop: 6 }}>{error}</p>}
+  </div>
+);
+
 export default function RegisterPage() {
   const [step, setStep] = useState<'form' | 'success'>('form');
   const [showPw, setShowPw] = useState(false);
@@ -47,15 +57,7 @@ export default function RegisterPage() {
     }
   };
 
-  const Field = ({ label, id, children, error }: any) => (
-    <div style={{ marginBottom: 20 }}>
-      <label htmlFor={id} style={{ display: 'block', marginBottom: 8, fontSize: '0.875rem', fontWeight: 500, color: '#94A3B8' }}>
-        {label}
-      </label>
-      {children}
-      {error && <p style={{ color: '#FCA5A5', fontSize: '0.8rem', marginTop: 6 }}>{error}</p>}
-    </div>
-  );
+
 
   if (step === 'success') {
     return (
