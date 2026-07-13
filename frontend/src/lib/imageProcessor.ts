@@ -98,22 +98,43 @@ export async function processImageLocally(
     const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
     const data = imgData.data;
 
-    let minX = tempCanvas.width, minY = tempCanvas.height, maxX = 0, maxY = 0;
+    // Find bounding box by density, ignoring outer 2% to avoid AI edge artifacts
+    const rowCounts = new Int32Array(tempCanvas.height);
+    const colCounts = new Int32Array(tempCanvas.width);
     
-    // Find bounding box (where alpha > 128 to ignore faint ghost edges from AI)
-    for (let y = 0; y < tempCanvas.height; y++) {
-      for (let x = 0; x < tempCanvas.width; x++) {
+    const marginX = Math.floor(tempCanvas.width * 0.02);
+    const marginY = Math.floor(tempCanvas.height * 0.02);
+
+    for (let y = marginY; y < tempCanvas.height - marginY; y++) {
+      for (let x = marginX; x < tempCanvas.width - marginX; x++) {
         const alpha = data[(y * tempCanvas.width + x) * 4 + 3];
-        if (alpha > 128) { 
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
+        if (alpha > 200) { // Solid pixels only
+          rowCounts[y]++;
+          colCounts[x]++;
         }
       }
     }
 
-    // Fallback if image is completely transparent
+    let minX = tempCanvas.width, minY = tempCanvas.height, maxX = 0, maxY = 0;
+    
+    // Require a contiguous block or enough density: at least 1% of the dimension
+    const thresholdX = tempCanvas.width * 0.01; 
+    const thresholdY = tempCanvas.height * 0.01;
+
+    for (let x = marginX; x < tempCanvas.width - marginX; x++) {
+      if (colCounts[x] > thresholdY) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+      }
+    }
+    for (let y = marginY; y < tempCanvas.height - marginY; y++) {
+      if (rowCounts[y] > thresholdX) {
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+
+    // Fallback if image is completely transparent or empty
     if (minX > maxX || minY > maxY) {
       minX = 0; minY = 0; maxX = tempCanvas.width; maxY = tempCanvas.height;
     }
