@@ -70,6 +70,7 @@ function GuestUploadWidget() {
   const [loading, setLoading] = useState(false);
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [downloadName, setDownloadName] = useState('photoproof_result.jpg');
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -110,6 +111,7 @@ function GuestUploadWidget() {
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setResultUrl(null);
+    setDownloadName(f.name.replace(/\.[^/.]+$/, "") + "_processed.jpg");
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -302,8 +304,18 @@ function GuestUploadWidget() {
             </div>
           </div>
 
+          <div style={{ marginBottom: 16, textAlign: 'left' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: '#94A3B8', marginBottom: 4 }}>File Name</label>
+            <input 
+              type="text" 
+              value={downloadName} 
+              onChange={(e) => setDownloadName(e.target.value)} 
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', fontSize: '0.9rem', outline: 'none' }} 
+            />
+          </div>
+
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <a href={resultUrl} download="photoproof_result.jpg" style={{ flex: 1 }}>
+            <a href={resultUrl} download={downloadName} style={{ flex: 1 }}>
               <button className="btn btn-success btn-full" style={{ gap: 8 }}>
                 <Download size={16} /> Download Result
               </button>

@@ -13,6 +13,7 @@ interface FileItem {
   id: string;
   file: File;
   preview: string;
+  customName: string;
   status: 'ready' | 'processing' | 'done' | 'error';
   processedFile?: File;
   processedPreview?: string;
@@ -55,6 +56,7 @@ export default function UploadPage() {
         id: Math.random().toString(36).slice(2),
         file: f,
         preview: URL.createObjectURL(f),
+        customName: f.name.replace(/\.[^/.]+$/, "") + "_processed.jpg",
         status: 'ready',
       }));
       setFiles((prev) => [...prev, ...newFiles].slice(0, 100));
@@ -80,6 +82,10 @@ export default function UploadPage() {
     });
     setFiles([]);
     setJob(null);
+  };
+
+  const updateFileName = (id: string, newName: string) => {
+    setFiles(prev => prev.map(f => f.id === id ? { ...f, customName: newName } : f));
   };
 
   const handleUpload = async () => {
@@ -119,8 +125,11 @@ export default function UploadPage() {
                 setStatusMsg(`Processing Batch ${Math.floor(i / CONCURRENCY_LIMIT) + 1}...`);
               }
             );
-            pFiles.push(pf);
-            updatedFiles[globalIndex].processedFile = pf;
+            
+            // Apply the custom name before sending to server
+            const renamedPf = new File([pf], fileItem.customName, { type: 'image/jpeg' });
+            pFiles.push(renamedPf);
+            updatedFiles[globalIndex].processedFile = renamedPf;
             updatedFiles[globalIndex].processedPreview = URL.createObjectURL(pf);
             updatedFiles[globalIndex].status = 'done';
             successCount++;
@@ -170,7 +179,7 @@ export default function UploadPage() {
       if (f.status === 'done' && f.processedPreview && f.processedFile) {
         const a = document.createElement('a');
         a.href = f.processedPreview;
-        a.download = f.processedFile.name;
+        a.download = f.customName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -199,27 +208,27 @@ export default function UploadPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 32 }}>
           {/* Resolution Width */}
           <div>
-            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
               <span>Width (px)</span>
-              <span style={{ color: '#F1F5F9', fontWeight: 600 }}>{targetWidth} px</span>
+              <input type="number" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ width: 80, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'right' }} />
             </label>
             <input type="range" min="100" max="2000" step="10" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
           </div>
 
           {/* Resolution Height */}
           <div>
-            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
               <span>Height (px)</span>
-              <span style={{ color: '#F1F5F9', fontWeight: 600 }}>{targetHeight} px</span>
+              <input type="number" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ width: 80, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'right' }} />
             </label>
             <input type="range" min="100" max="2000" step="10" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
           </div>
 
           {/* Max Size */}
           <div>
-            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
               <span>Max File Size (KB)</span>
-              <span style={{ color: '#F1F5F9', fontWeight: 600 }}>{targetSizeKb} KB</span>
+              <input type="number" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: 80, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'right' }} />
             </label>
             <input type="range" min="10" max="1000" step="5" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
           </div>
@@ -337,9 +346,16 @@ export default function UploadPage() {
                   
                   {/* Info Footer */}
                   <div style={{ padding: '8px', background: '#0D1322' }}>
-                    <p style={{ color: '#F1F5F9', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
-                      {f.file.name}
-                    </p>
+                    <input 
+                      type="text" 
+                      value={f.customName} 
+                      onChange={(e) => updateFileName(f.id, e.target.value)}
+                      style={{ 
+                        width: '100%', padding: '2px 6px', borderRadius: 4, 
+                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', 
+                        color: '#F1F5F9', fontSize: '0.75rem', marginBottom: 6 
+                      }}
+                    />
                     {f.processedFile ? (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: '#10B981', fontSize: '0.7rem', fontWeight: 600 }}>
@@ -348,7 +364,7 @@ export default function UploadPage() {
                         <span style={{ color: '#94A3B8', fontSize: '0.7rem' }}>
                           {targetWidth}x{targetHeight}
                         </span>
-                        <a href={f.processedPreview} download={f.processedFile.name} title="Download individual JPEG">
+                        <a href={f.processedPreview} download={f.customName} title="Download individual JPEG">
                           <Download size={14} color="#818CF8" style={{ cursor: 'pointer' }} />
                         </a>
                       </div>
