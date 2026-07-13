@@ -100,11 +100,11 @@ export async function processImageLocally(
 
     let minX = tempCanvas.width, minY = tempCanvas.height, maxX = 0, maxY = 0;
     
-    // Find bounding box (where alpha > 10)
+    // Find bounding box (where alpha > 128 to ignore faint ghost edges from AI)
     for (let y = 0; y < tempCanvas.height; y++) {
       for (let x = 0; x < tempCanvas.width; x++) {
         const alpha = data[(y * tempCanvas.width + x) * 4 + 3];
-        if (alpha > 10) { 
+        if (alpha > 128) { 
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
           if (y < minY) minY = y;
@@ -118,15 +118,6 @@ export async function processImageLocally(
       minX = 0; minY = 0; maxX = tempCanvas.width; maxY = tempCanvas.height;
     }
     
-    // Add a tiny bit of padding to the bounding box from the original image (5%)
-    // so we don't accidentally cut off pixels
-    const padX = Math.max(0, (maxX - minX) * 0.05);
-    const padY = Math.max(0, (maxY - minY) * 0.05);
-    minX = Math.max(0, minX - padX);
-    maxX = Math.min(tempCanvas.width, maxX + padX);
-    minY = Math.max(0, minY - padY);
-    maxY = Math.min(tempCanvas.height, maxY + padY);
-
     const cropWidth = maxX - minX;
     const cropHeight = maxY - minY;
 
@@ -142,16 +133,18 @@ export async function processImageLocally(
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // Contain scale logic for the CROPPED area
-    // Leave 5% padding around the canvas so the subject isn't touching the edge
-    const padding = 0.05; 
-    const availableW = canvas.width * (1 - padding * 2);
-    const availableH = canvas.height * (1 - padding * 2);
+    // Leave padding around the sides and top, but anchor strictly to the bottom
+    const paddingX = canvas.width * 0.15; // 15% total horizontal padding (7.5% per side)
+    const paddingTop = canvas.height * 0.08; // 8% padding on top
+
+    const availableW = canvas.width - paddingX;
+    const availableH = canvas.height - paddingTop;
 
     const scale = Math.min(availableW / cropWidth, availableH / cropHeight);
     const drawW = cropWidth * scale;
     const drawH = cropHeight * scale;
     const x = (canvas.width - drawW) / 2;
-    const y = canvas.height - drawH - (canvas.height * padding); // Anchor slightly to bottom
+    const y = canvas.height - drawH; // Anchor strictly to bottom!
     
     // Draw only the cropped portion on top
     ctx.drawImage(tempCanvas, minX, minY, cropWidth, cropHeight, x, y, drawW, drawH);
