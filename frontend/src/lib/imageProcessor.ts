@@ -86,6 +86,50 @@ export async function processImageLocally(
     }
 
     const bitmap = await createImageBitmap(bgRemovedBlob);
+    
+    // Create an offscreen canvas to find bounding box
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = bitmap.width;
+    tempCanvas.height = bitmap.height;
+    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+    if (!tempCtx) throw new Error('Failed to get temp context');
+    
+    tempCtx.drawImage(bitmap, 0, 0);
+    const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+    const data = imgData.data;
+
+    let minX = tempCanvas.width, minY = tempCanvas.height, maxX = 0, maxY = 0;
+    
+    // Find bounding box (where alpha > 10)
+    for (let y = 0; y < tempCanvas.height; y++) {
+      for (let x = 0; x < tempCanvas.width; x++) {
+        const alpha = data[(y * tempCanvas.width + x) * 4 + 3];
+        if (alpha > 10) { 
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    // Fallback if image is completely transparent
+    if (minX > maxX || minY > maxY) {
+      minX = 0; minY = 0; maxX = tempCanvas.width; maxY = tempCanvas.height;
+    }
+    
+    // Add a tiny bit of padding to the bounding box from the original image (5%)
+    // so we don't accidentally cut off pixels
+    const padX = Math.max(0, (maxX - minX) * 0.05);
+    const padY = Math.max(0, (maxY - minY) * 0.05);
+    minX = Math.max(0, minX - padX);
+    maxX = Math.min(tempCanvas.width, maxX + padX);
+    minY = Math.max(0, minY - padY);
+    maxY = Math.min(tempCanvas.height, maxY + padY);
+
+    const cropWidth = maxX - minX;
+    const cropHeight = maxY - minY;
+
     const canvas = document.createElement('canvas');
     canvas.width = options.width;
     canvas.height = options.height;
@@ -97,15 +141,20 @@ export async function processImageLocally(
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Contain scale logic (preserve aspect ratio, fit inside exactly)
-    const scale = Math.min(canvas.width / bitmap.width, canvas.height / bitmap.height);
-    const drawW = bitmap.width * scale;
-    const drawH = bitmap.height * scale;
+    // Contain scale logic for the CROPPED area
+    // Leave 5% padding around the canvas so the subject isn't touching the edge
+    const padding = 0.05; 
+    const availableW = canvas.width * (1 - padding * 2);
+    const availableH = canvas.height * (1 - padding * 2);
+
+    const scale = Math.min(availableW / cropWidth, availableH / cropHeight);
+    const drawW = cropWidth * scale;
+    const drawH = cropHeight * scale;
     const x = (canvas.width - drawW) / 2;
-    const y = (canvas.height - drawH) / 2;
+    const y = canvas.height - drawH - (canvas.height * padding); // Anchor slightly to bottom
     
-    // Draw the image on top
-    ctx.drawImage(bitmap, x, y, drawW, drawH);
+    // Draw only the cropped portion on top
+    ctx.drawImage(tempCanvas, minX, minY, cropWidth, cropHeight, x, y, drawW, drawH);
 
     // 3. Compress quality to meet strictly < targetSizeKb
     if (onProgress) {

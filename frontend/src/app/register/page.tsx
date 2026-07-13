@@ -26,7 +26,6 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
-    transactionId: '',
     paymentMethod: 'jazzcash',
     paymentNote: '',
   });
@@ -193,11 +192,11 @@ export default function RegisterPage() {
               </div>
 
               <p style={{ color: '#64748B', fontSize: '0.82rem', marginBottom: 20, lineHeight: 1.6 }}>
-                <strong style={{ color: '#94A3B8' }}>Payment Info</strong> — Add your transaction ID after paying.
-                Admin will verify and activate your account within 24 hours.
+                <strong style={{ color: '#94A3B8' }}>Payment Info</strong> — Send a screenshot of your payment to WhatsApp (<strong>0306 9136380</strong>). 
+                Admin will verify and activate your account within a few minutes.
               </p>
 
-              <Field label="Payment Method" id="reg-payment-method">
+              <Field label="Payment Method Used" id="reg-payment-method">
                 <select id="reg-payment-method" className="input"
                   value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
                   <option value="jazzcash">JazzCash</option>
@@ -205,15 +204,6 @@ export default function RegisterPage() {
                   <option value="bank_transfer">Bank Transfer</option>
                   <option value="other">Other</option>
                 </select>
-              </Field>
-
-              <Field label="Transaction ID (Optional)" id="reg-txn">
-                <div style={{ position: 'relative' }}>
-                  <CreditCard size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                  <input id="reg-txn" className="input" type="text" placeholder="e.g. T123456789"
-                    value={form.transactionId} onChange={(e) => setForm({ ...form, transactionId: e.target.value })}
-                    style={{ paddingLeft: 42 }} />
-                </div>
               </Field>
             </div>
 
