@@ -304,7 +304,7 @@ const guestUpload = async (req, res) => {
     res.send(finalBuffer);
   } catch (err) {
     console.error('Guest upload error:', err);
-    res.status(500).json({ error: 'Processing failed.' });
+    res.status(500).json({ error: err.message || 'Processing failed.' });
   } finally {
     const fs = require('fs').promises;
     fs.unlink(req.file.path).catch(console.error);

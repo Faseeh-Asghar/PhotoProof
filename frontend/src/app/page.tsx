@@ -61,9 +61,6 @@ function Navbar() {
 
 // ─── Guest Upload Widget ───────────────────────────────────────────────────────
 function GuestUploadWidget() {
-  const [trialStatus, setTrialStatus] = useState<'unrequested' | 'pending' | 'approved'>('unrequested');
-  const [pendingProgress, setPendingProgress] = useState(0);
-
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,37 +69,6 @@ function GuestUploadWidget() {
   const [downloadName, setDownloadName] = useState('photoproof_result.jpg');
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-
-  useEffect(() => {
-    if (localStorage.getItem('ai_ready') === 'true') {
-      setTrialStatus('approved');
-    }
-  }, []);
-
-  const requestTrial = async () => {
-    const uses = parseInt(localStorage.getItem('guest_uses') || '0', 10);
-    if (uses >= 3) {
-      toast.error('Free limit reached (3/3 lifetime). Please sign up for unlimited access!');
-      return;
-    }
-
-    setTrialStatus('pending');
-    setPendingProgress(0);
-    try {
-      // Fake delay since AI is now backend
-      for (let i = 0; i <= 100; i += 10) {
-        setPendingProgress(i);
-        await new Promise(r => setTimeout(r, 200));
-      }
-      localStorage.setItem('ai_ready', 'true');
-      setTrialStatus('approved');
-      toast.success('Admin Approved! You have 3 free images.');
-    } catch (e) {
-      console.error(e);
-      toast.error('Network error while waiting for admin. Please refresh and try again.');
-      setTrialStatus('unrequested');
-    }
-  };
 
   const handleFile = (f: File) => {
     if (!f.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
@@ -158,7 +124,17 @@ function GuestUploadWidget() {
       toast.success('✅ Photo processed flawlessly!');
     } catch (err: any) {
       console.error(err);
-      toast.error('Processing failed — please try a different image.');
+      let errMsg = 'Processing failed — please try a different image.';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json.error) errMsg = json.error;
+        } catch (e) {}
+      } else if (err.response?.data?.error) {
+        errMsg = err.response.data.error;
+      }
+      toast.error(errMsg);
     } finally {
       setLoading(false);
       setProgressMsg(null);
@@ -192,42 +168,7 @@ function GuestUploadWidget() {
         <p style={{ color: '#64748B', fontSize: '0.875rem' }}>See the exact results before upgrading your school.</p>
       </div>
 
-      {trialStatus === 'unrequested' && (
-        <div style={{ textAlign: 'center', padding: '30px 20px', background: 'rgba(79,70,229,0.06)', borderRadius: 14 }}>
-          <Shield size={36} color="#818CF8" style={{ margin: '0 auto 16px' }} />
-          <h4 style={{ color: '#F1F5F9', marginBottom: 8, fontSize: '1.1rem' }}>Admin Approval Required</h4>
-          <p style={{ color: '#94A3B8', fontSize: '0.9rem', marginBottom: 24, lineHeight: 1.6, maxWidth: 400, margin: '0 auto' }}>
-            To prevent abuse, free trials require a quick automated admin review. Request your trial below to get 3 free images for life.
-          </p>
-          <motion.button 
-            className="btn btn-primary" 
-            onClick={requestTrial}
-            whileHover={{ scale: 1.02 }}
-            style={{ padding: '12px 32px', fontSize: '1rem', gap: 8 }}
-          >
-            <Check size={18} /> Request Free Trial
-          </motion.button>
-        </div>
-      )}
-
-      {trialStatus === 'pending' && (
-        <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(79,70,229,0.04)', borderRadius: 14 }}>
-          <Loader2 size={36} className="animate-spin" color="#818CF8" style={{ margin: '0 auto 16px' }} />
-          <h4 style={{ color: '#F1F5F9', marginBottom: 8, fontSize: '1.1rem' }}>Waiting for Admin Review...</h4>
-          <p style={{ color: '#94A3B8', fontSize: '0.9rem', marginBottom: 24, lineHeight: 1.6 }}>
-            This usually takes 2 to 5 minutes depending on the queue. <br/>
-            <strong>Please do not close this page.</strong>
-          </p>
-          <div style={{ maxWidth: 300, margin: '0 auto' }}>
-            <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-              <div style={{ height: '100%', background: '#4F46E5', width: `${pendingProgress}%`, transition: 'width 0.3s ease-out' }} />
-            </div>
-            <p style={{ color: '#64748B', fontSize: '0.75rem' }}>Establishing secure connection... {pendingProgress}%</p>
-          </div>
-        </div>
-      )}
-
-      {trialStatus === 'approved' && !resultUrl && (
+      {!resultUrl && (
         <>
           <div
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}

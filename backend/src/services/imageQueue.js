@@ -113,6 +113,10 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   blobSizes.sort((a, b) => b.size - a.size);
   const largestBlobId = blobSizes.length > 0 ? blobSizes[0].id : -1;
 
+  if (largestBlobId === -1) {
+    throw new Error("No subject detected in image. Please upload a clearer photo.");
+  }
+
   let minX = width, minY = height, maxX = 0, maxY = 0;
   
   for (let y = 0; y < height; y++) {
