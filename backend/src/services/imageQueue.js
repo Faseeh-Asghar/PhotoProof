@@ -54,7 +54,6 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   let bgRemovedBlob;
   try {
     const config = {
-      publicPath: 'file://' + path.join(__dirname, '../../node_modules/@imgly/background-removal-node/dist/').replace(/\\/g, '/'),
       debug: false
     };
     bgRemovedBlob = await removeBackground(fileUrl, config);

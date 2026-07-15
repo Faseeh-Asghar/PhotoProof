@@ -446,56 +446,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Active Jobs */}
-      {jobs.length > 0 && (
-        <motion.div
-          className="card"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-            <h3 style={{ fontSize: '1.1rem' }}>Available Downloads</h3>
-          </div>
-
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Files</th>
-                <th>Status</th>
-                <th>Download</th>
-                <th>Delete</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((job) => (
-                <tr key={job.id}>
-                  <td>{new Date(job.created_at).toLocaleDateString('en-PK')}</td>
-                  <td>{job.processed_files}/{job.total_files} processed</td>
-                  <td><span className={`badge ${statusBadge(job.status)}`}>{job.status}</span></td>
-                  <td>
-                    {job.zip_url && job.status === 'completed' ? (
-                      <a href={uploadApi.downloadUrl(job.id)} download>
-                        <button className="btn btn-success btn-sm" style={{ gap: 6 }}>
-                          <Download size={13} /> ZIP
-                        </button>
-                      </a>
-                    ) : (
-                      <span style={{ color: '#475569', fontSize: '0.8rem' }}>—</span>
-                    )}
-                  </td>
-                  <td>
-                    <button onClick={() => handleDeleteJob(job.id)} className="btn btn-ghost btn-sm" style={{ color: '#EF4444', padding: '6px 8px' }}>
-                      <Trash2 size={15} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </motion.div>
-      )}
     </div>
   );
 }
