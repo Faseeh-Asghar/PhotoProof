@@ -141,6 +141,17 @@ const getJobStatus = async (req, res) => {
 
     const job = result.rows[0];
     
+    // Add processedUrl for frontend previews
+    job.files = job.files.map(f => {
+      if (f.status === 'completed' && f.processedPath) {
+        return {
+          ...f,
+          processedUrl: '/processed/' + require('path').basename(f.processedPath)
+        };
+      }
+      return f;
+    });
+    
     // Check if we need to mark it as complete and zip it
     const completedCount = job.files.filter(f => f.status === 'completed').length;
     const failedCount = job.files.filter(f => f.status === 'failed').length;
@@ -169,12 +180,8 @@ const getJobStatus = async (req, res) => {
         });
         await archive.finalize();
         
-        // Clean up individual processed images
-        job.files.forEach(f => {
-          if (f.status === 'completed' && f.processedPath) {
-             fs.unlink(f.processedPath).catch(() => {});
-          }
-        });
+        // We no longer delete the individual images immediately so the frontend can display previews.
+        // A future cron job should clean up /processed and /zips periodically.
       }
       
       await query(`UPDATE jobs SET status = 'completed', processed_files = $1, failed_files = $2 WHERE id = $3`, [completedCount, failedCount, job.id]);

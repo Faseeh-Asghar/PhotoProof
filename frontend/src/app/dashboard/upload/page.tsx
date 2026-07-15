@@ -148,7 +148,14 @@ export default function UploadPage() {
           setFiles(prev => prev.map(f => {
             const serverFile = st.files.find((sf: any) => sf.originalName === f.file.name);
             if (serverFile) {
-              if (serverFile.status === 'completed') return { ...f, status: 'done' };
+              if (serverFile.status === 'completed') {
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+                return { 
+                  ...f, 
+                  status: 'done',
+                  processedPreview: serverFile.processedUrl ? baseUrl + serverFile.processedUrl : f.processedPreview 
+                };
+              }
               if (serverFile.status === 'failed') return { ...f, status: 'error' };
             }
             return f;

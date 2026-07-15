@@ -67,6 +67,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Serve processed files for previews
+app.use('/processed', express.static(path.join(__dirname, '../../processed')));
+
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.originalUrl} not found` });
