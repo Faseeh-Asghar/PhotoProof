@@ -26,9 +26,7 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    // Determine the backend URL. You can use a new BACKEND_URL variable in Vercel, 
-    // or just fallback to the NEXT_PUBLIC_API_URL they already set.
-    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const backendUrl = 'http://168.144.38.111';
     return [
       {
         source: '/api/:path*',
