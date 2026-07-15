@@ -55,8 +55,9 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
       model: "medium",
       debug: false
     };
-    const image_src = `file://${filePath}`;
-    bgRemovedBlob = await removeBackground(image_src, config);
+    const buffer = await fs.readFile(filePath);
+    const uint8Array = new Uint8Array(buffer);
+    bgRemovedBlob = await removeBackground(uint8Array, config);
   } catch (err) {
     console.error("AI Background Removal threw an error:", err);
     throw new Error(`AI engine failed: ${err.message || err}`);
@@ -64,6 +65,9 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
 
   const arrayBuf = await bgRemovedBlob.arrayBuffer();
   const bgRemovedBuffer = Buffer.from(arrayBuf);
+  console.log('AI Output type:', bgRemovedBlob.type);
+  console.log('AI Output Buffer length:', bgRemovedBuffer.length);
+  console.log('AI Output Buffer string:', bgRemovedBuffer.slice(0, 100).toString('utf8'));
 
   if (bgRemovedBuffer.length < 100) {
     throw new Error("AI engine returned an empty output. This may be due to low server memory or a corrupted input file.");
@@ -71,11 +75,17 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
 
   reportProgress(60);
 
-  // 2. Perform Connected Component Analysis and Bounding Box Extraction
-  const { data, info } = await sharp(bgRemovedBuffer)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  let data, info;
+  try {
+    const sharpOutput = await sharp(bgRemovedBuffer)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    data = sharpOutput.data;
+    info = sharpOutput.info;
+  } catch(err) {
+    throw new Error(`Sharp failed. Buffer len: ${bgRemovedBuffer.length}, type: ${bgRemovedBlob.type}, start: ${bgRemovedBuffer.slice(0, 30).toString('utf8')}. Error: ${err.message}`);
+  }
 
   const width = info.width;
   const height = info.height;
