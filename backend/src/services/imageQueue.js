@@ -54,12 +54,13 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   let bgRemovedBlob;
   try {
     const config = {
+      model: "small",
       debug: false
     };
     bgRemovedBlob = await removeBackground(fileUrl, config);
   } catch (err) {
     console.error("AI Background Removal threw an error:", err);
-    throw new Error("AI engine failed to process the image. Please try a different photo.");
+    throw new Error(`AI engine failed: ${err.message || err}`);
   }
 
   const arrayBuf = await bgRemovedBlob.arrayBuffer();
@@ -202,6 +203,6 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   return finalBuffer;
 }
 
-imageQueue.process(2, processImageJob);
+imageQueue.process(1, processImageJob);
 
 module.exports = { imageQueue, PROCESSED_DIR, processImageBuffer };
