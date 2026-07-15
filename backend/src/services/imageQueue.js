@@ -33,7 +33,7 @@ async function processImageJob(job) {
 
     // Update database
     await query(
-      `UPDATE job_files SET status = 'completed', processed_path = $1, processed_size_bytes = $2 WHERE id = $3`,
+      `UPDATE job_files SET status = 'completed', processed_name = $1, processed_size_bytes = $2 WHERE id = $3`,
       [finalPath, finalBuffer.length, fileId]
     );
 

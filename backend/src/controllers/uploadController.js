@@ -86,8 +86,8 @@ const uploadBatch = async (req, res) => {
       
       // We rely on the body arrays if custom names were provided (this assumes frontend sends customNames[index] or similar, but for now we use originalname)
       await query(
-        `INSERT INTO job_files (id, job_id, original_name, status, file_path) 
-         VALUES ($1, $2, $3, 'pending', $4)`,
+        `INSERT INTO job_files (id, job_id, original_name, status, stored_name) 
+         VALUES ($1, $2, $3, 'queued', $4)`,
         [fileId, jobId, file.originalname, file.path]
       );
 
@@ -110,7 +110,7 @@ const uploadBatch = async (req, res) => {
     });
   } catch (err) {
     console.error('Upload batch error:', err);
-    return res.status(500).json({ error: 'Upload failed. Please try again.' });
+    return res.status(500).json({ error: err.message || 'Upload failed. Please try again.' });
   }
 };
 
@@ -126,7 +126,7 @@ const getJobStatus = async (req, res) => {
                 'id', jf.id, 'originalName', jf.original_name,
                 'status', jf.status, 'error', jf.error_message,
                 'sizeBytes', jf.processed_size_bytes,
-                'processedPath', jf.processed_path
+                'processedPath', jf.processed_name
               ) ORDER BY jf.created_at) as files
        FROM jobs j
        LEFT JOIN job_files jf ON jf.job_id = j.id
