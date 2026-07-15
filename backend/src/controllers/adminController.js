@@ -1,6 +1,7 @@
 const { query } = require('../db');
 const { sendApprovalEmail } = require('../services/email');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 // ─── List all users ───────────────────────────────────────────────────────────
 const listUsers = async (req, res) => {
@@ -263,20 +264,17 @@ const updatePassword = async (req, res) => {
   }
 
   try {
-    // Generate salt and hash
-    const salt = crypto.randomBytes(16).toString('hex');
-    crypto.pbkdf2(password, salt, 310000, 32, 'sha256', async (err, hashedPassword) => {
-      if (err) return res.status(500).json({ error: 'Password hashing failed' });
-      
-      const passwordHash = hashedPassword.toString('hex');
-      await query(
-        'UPDATE users SET password_hash = $1, password_salt = $2 WHERE id = $3',
-        [passwordHash, salt, id]
-      );
-      
-      return res.json({ message: 'Password updated successfully' });
-    });
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(password, salt);
+    
+    await query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [passwordHash, id]
+    );
+    
+    return res.json({ message: 'Password updated successfully' });
   } catch (err) {
+    console.error('Password update error:', err);
     return res.status(500).json({ error: 'Failed to update password' });
   }
 };

@@ -8,7 +8,6 @@ import {
   Loader2, FileImage, Users
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
-import { processImageLocally, preloadAI } from '@/lib/imageProcessor';
 import toast from 'react-hot-toast';
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
@@ -90,11 +89,11 @@ function GuestUploadWidget() {
     setTrialStatus('pending');
     setPendingProgress(0);
     try {
-      await preloadAI((pct) => {
-        setPendingProgress(pct);
-      });
-      // The heavy parsing takes a few seconds after fetch is 100%, so we add a little fake delay at 100%
-      await new Promise(r => setTimeout(r, 2000));
+      // Fake delay since AI is now backend
+      for (let i = 0; i <= 100; i += 10) {
+        setPendingProgress(i);
+        await new Promise(r => setTimeout(r, 200));
+      }
       localStorage.setItem('ai_ready', 'true');
       setTrialStatus('approved');
       toast.success('Admin Approved! You have 3 free images.');
@@ -131,20 +130,42 @@ function GuestUploadWidget() {
     }
 
     setLoading(true);
-    setProgressMsg('Initializing AI model...');
+    setLoading(true);
+    setProgressMsg('Uploading photo...');
     try {
-      // 100% Offline AI Processing
-      const processedFile = await processImageLocally(
-        file,
-        { width: 600, height: 800, maxSizeKb: 20 },
-        (msg) => setProgressMsg(msg)
-      );
+      // 1. Fast scale down (1024px max) to save upload bandwidth
+      const bmp = await createImageBitmap(file);
+      let w = bmp.width; let h = bmp.height;
+      if (Math.max(w, h) > 1024) {
+        const ratio = 1024 / Math.max(w, h);
+        w = Math.round(w * ratio); h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d')?.drawImage(bmp, 0, 0, w, h);
+      const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.9));
       
-      const url = URL.createObjectURL(processedFile);
-      setResultUrl(url);
+      const rawFile = blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file;
+
+      // 2. Upload to server
+      const res = await uploadApi.batch([rawFile], { width: 600, height: 800, sizeKb: 20 });
+      const { jobId } = res.data;
+
+      // 3. Poll for completion
+      setProgressMsg('AI Processing on server...');
+      let isDone = false;
+      while (!isDone) {
+        await new Promise(r => setTimeout(r, 2000));
+        const stRes = await uploadApi.jobStatus(jobId);
+        const st = stRes.data;
+        if (st.status === 'completed' || st.status === 'partial') {
+           setResultUrl(uploadApi.downloadUrl(jobId));
+           isDone = true;
+        }
+      }
       
       localStorage.setItem('guest_uses', (uses + 1).toString());
-      toast.success('✅ Photo processed flawlessly (100% Offline)!');
+      toast.success('✅ Photo processed flawlessly!');
     } catch (err: any) {
       console.error(err);
       toast.error('Processing failed — please try a different image.');
@@ -305,7 +326,9 @@ function GuestUploadWidget() {
           </div>
 
           <div style={{ marginBottom: 16, textAlign: 'left' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: '#94A3B8', marginBottom: 4 }}>File Name</label>
+            <div style={{ color: '#64748B', fontSize: '0.75rem', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Original: {file?.name || 'Unknown'}
+            </div>
             <input 
               type="text" 
               value={downloadName} 
@@ -351,9 +374,6 @@ export default function HomePage() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
-    // Silently preload the 40MB AI model in the background as soon as they land on the page
-    preloadAI();
-
     // Listen for PWA install prompt
     const handler = (e: any) => {
       e.preventDefault();

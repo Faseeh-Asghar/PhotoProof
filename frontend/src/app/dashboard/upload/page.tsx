@@ -6,7 +6,6 @@ import {
   Upload, X, CheckCircle, AlertCircle, Download, FileImage, Trash2, Zap, Loader2, ImageIcon, Image as ImageIcon2
 } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
-import { processImageLocally, preloadAI } from '@/lib/imageProcessor';
 import toast from 'react-hot-toast';
 
 interface FileItem {
@@ -98,74 +97,67 @@ export default function UploadPage() {
       toast.success('Processing images...');
       
       const pFiles: File[] = [];
-      let successCount = 0;
-      let failCount = 0;
 
-      // 1. Process files locally and update UI
-      const updatedFiles = [...files];
-      const CONCURRENCY_LIMIT = 2;
-
-      for (let i = 0; i < updatedFiles.length; i += CONCURRENCY_LIMIT) {
-        const chunk = updatedFiles.slice(i, i + CONCURRENCY_LIMIT);
-        
-        // Mark chunk as processing
-        chunk.forEach(f => f.status = 'processing');
-        setFiles([...updatedFiles]);
-
-        // Yield back to main thread to allow UI to update and prevent freezing
-        await new Promise(resolve => setTimeout(resolve, 150));
-
-        await Promise.all(chunk.map(async (fileItem, indexInChunk) => {
-          const globalIndex = i + indexInChunk;
-          try {
-            const pf = await processImageLocally(
-              fileItem.file,
-              { width: targetWidth, height: targetHeight, maxSizeKb: targetSizeKb },
-              (status) => {
-                setStatusMsg(`Processing Batch ${Math.floor(i / CONCURRENCY_LIMIT) + 1}...`);
-              }
-            );
-            
-            // Apply the custom name before sending to server
-            const renamedPf = new File([pf], fileItem.customName, { type: 'image/jpeg' });
-            pFiles.push(renamedPf);
-            updatedFiles[globalIndex].processedFile = renamedPf;
-            updatedFiles[globalIndex].processedPreview = URL.createObjectURL(pf);
-            updatedFiles[globalIndex].status = 'done';
-            successCount++;
-          } catch (e) {
-            console.error('Failed to process', fileItem.file.name, e);
-            updatedFiles[globalIndex].status = 'error';
-            failCount++;
+      // 1. Fast resize locally (no AI) to save upload bandwidth
+      setStatusMsg('Preparing images...');
+      for (const f of files) {
+        try {
+          const bmp = await createImageBitmap(f.file);
+          let w = bmp.width; let h = bmp.height;
+          if (Math.max(w, h) > 1024) {
+            const ratio = 1024 / Math.max(w, h);
+            w = Math.round(w * ratio); h = Math.round(h * ratio);
           }
-        }));
-
-        setUploadPct(Math.round(((i + chunk.length) / updatedFiles.length) * 50)); 
-        setFiles([...updatedFiles]);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d')?.drawImage(bmp, 0, 0, w, h);
+          const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.9));
+          
+          if (blob) {
+            pFiles.push(new File([blob], f.customName, { type: 'image/jpeg' }));
+          } else {
+            pFiles.push(new File([f.file], f.customName, { type: f.file.type }));
+          }
+        } catch {
+          pFiles.push(new File([f.file], f.customName, { type: f.file.type }));
+        }
       }
 
       if (pFiles.length === 0) {
         throw new Error('All files failed local processing.');
       }
 
-      // 2. Upload processed files (50% to 100%)
-      setStatusMsg('Uploading to server for job tracking & ZIP creation...');
-      setUploadPct(50);
-      const res = await uploadApi.batch(pFiles, (pct) => setUploadPct(50 + Math.round(pct / 2)));
+      // 2. Upload raw files to server
+      setStatusMsg('Uploading to server...');
+      setUploadPct(10);
+      const res = await uploadApi.batch(pFiles, { width: targetWidth, height: targetHeight, sizeKb: targetSizeKb }, (pct) => setUploadPct(10 + Math.round(pct * 0.4)));
       
-      const { jobId, downloadUrl } = res.data;
+      const { jobId } = res.data;
 
-      setJob({
-        jobId,
-        status: 'completed',
-        totalFiles: files.length,
-        processedFiles: successCount,
-        failedFiles: failCount,
-        progress: 100,
-        downloadUrl: downloadUrl || null,
-      });
-
-      toast.success(`✅ All ${successCount} photos processed!`);
+      // 3. Poll for AI progress on server
+      setStatusMsg('AI processing on server...');
+      let isDone = false;
+      while (!isDone) {
+        await new Promise(r => setTimeout(r, 2000));
+        const stRes = await uploadApi.jobStatus(jobId);
+        const st = stRes.data;
+        
+        setUploadPct(50 + Math.round(st.progress / 2));
+        
+        if (st.status === 'completed' || st.status === 'partial') {
+          setJob({
+            jobId,
+            status: st.status,
+            totalFiles: st.totalFiles,
+            processedFiles: st.processedFiles,
+            failedFiles: st.failedFiles,
+            progress: 100,
+            downloadUrl: st.downloadUrl || null,
+          });
+          toast.success(`✅ Server finished processing ${st.processedFiles} photos!`);
+          isDone = true;
+        }
+      }
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || 'Processing failed. Please try again.';
       toast.error(msg);
@@ -205,32 +197,37 @@ export default function UploadPage() {
           <Zap size={18} color="#818CF8" /> Processing Settings
         </h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 32 }}>
-          {/* Resolution Width */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {/* Dimensions */}
           <div>
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
-              <span>Width (px)</span>
-              <input type="number" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ width: 80, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'right' }} />
-            </label>
-            <input type="range" min="100" max="2000" step="10" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
-          </div>
-
-          {/* Resolution Height */}
-          <div>
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
-              <span>Height (px)</span>
-              <input type="number" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ width: 80, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'right' }} />
-            </label>
-            <input type="range" min="100" max="2000" step="10" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
+            <label style={{ display: 'block', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>Dimensions (W x H)</label>
+            <select className="input" style={{ width: '100%', marginBottom: 8, padding: '10px', borderRadius: 8 }} value={`${targetWidth}x${targetHeight}`} onChange={(e) => {
+              if (e.target.value === 'custom') return;
+              const [w, h] = e.target.value.split('x');
+              setTargetWidth(Number(w)); setTargetHeight(Number(h));
+            }}>
+              <option value="600x800">600x800 (Standard)</option>
+              <option value="413x531">413x531 (ID Size)</option>
+              <option value="800x1200">800x1200 (High Res)</option>
+              <option value="custom">Custom...</option>
+            </select>
+            <div style={{ display: 'flex', gap: 8 }}>
+               <input type="number" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center' }} placeholder="W" />
+               <span style={{ color: '#64748B', alignSelf: 'center' }}>x</span>
+               <input type="number" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center' }} placeholder="H" />
+            </div>
           </div>
 
           {/* Max Size */}
           <div>
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>
-              <span>Max File Size (KB)</span>
-              <input type="number" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: 80, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'right' }} />
-            </label>
-            <input type="range" min="10" max="1000" step="5" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: '100%', accentColor: '#4F46E5' }} />
+            <label style={{ display: 'block', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>Max File Size (KB)</label>
+            <select className="input" style={{ width: '100%', marginBottom: 8, padding: '10px', borderRadius: 8 }} value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))}>
+              <option value="20">20 KB (Form Limit)</option>
+              <option value="50">50 KB (Medium)</option>
+              <option value="100">100 KB (High Quality)</option>
+              <option value="500">500 KB (Max)</option>
+            </select>
+            <input type="number" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center' }} placeholder="Custom KB" />
           </div>
         </div>
       </div>
@@ -346,12 +343,15 @@ export default function UploadPage() {
                   
                   {/* Info Footer */}
                   <div style={{ padding: '8px', background: '#0D1322' }}>
+                    <div style={{ color: '#64748B', fontSize: '0.65rem', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={f.file.name}>
+                      Original: {f.file.name}
+                    </div>
                     <input 
                       type="text" 
                       value={f.customName} 
                       onChange={(e) => updateFileName(f.id, e.target.value)}
                       style={{ 
-                        width: '100%', padding: '2px 6px', borderRadius: 4, 
+                        width: '100%', padding: '4px 6px', borderRadius: 4, 
                         border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', 
                         color: '#F1F5F9', fontSize: '0.75rem', marginBottom: 6 
                       }}

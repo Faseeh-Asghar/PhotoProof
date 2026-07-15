@@ -45,9 +45,14 @@ export const authApi = {
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
 export const uploadApi = {
-  batch: (files: File[], onProgress?: (pct: number) => void) => {
+  batch: (files: File[], settings?: any, onProgress?: (pct: number) => void) => {
     const form = new FormData();
     files.forEach((f) => form.append('images', f));
+    if (settings) {
+      if (settings.width) form.append('targetWidth', settings.width);
+      if (settings.height) form.append('targetHeight', settings.height);
+      if (settings.sizeKb) form.append('targetSizeKb', settings.sizeKb);
+    }
     return api.post('/api/upload/batch', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 300000,

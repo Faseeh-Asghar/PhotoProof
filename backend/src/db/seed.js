@@ -7,8 +7,13 @@ const { query } = require('../db');
  */
 async function seedAdmin() {
   try {
-    const adminEmail = process.env.ADMIN_EMAIL || 'faseehasghar167@gmail.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@PhotoProof2024';
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminEmail || !adminPassword) {
+      console.warn('⚠️ ADMIN_EMAIL or ADMIN_PASSWORD not set in environment. Skipping admin seed.');
+      return;
+    }
 
     const hash = await bcrypt.hash(adminPassword, 12);
 

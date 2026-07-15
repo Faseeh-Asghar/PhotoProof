@@ -13,7 +13,6 @@
     "license": "ISC",
     "type": "commonjs",
     "dependencies": {
-        "@gradio/client": "^2.3.1",
         "@imgly/background-removal-node": "^1.4.5",
         "archiver": "^7.0.1",
         "axios": "^1.18.1",

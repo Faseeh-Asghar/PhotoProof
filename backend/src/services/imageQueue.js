@@ -1,0 +1,196 @@
+const Queue = require('bull');
+const fs = require('fs').promises;
+const path = require('path');
+const sharp = require('sharp');
+const { removeBackground } = require('@imgly/background-removal-node');
+const { query } = require('../db');
+
+const imageQueue = new Queue('image-processing', {
+  redis: {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: process.env.REDIS_PORT || 6379,
+  },
+});
+
+const PROCESSED_DIR = path.join(__dirname, '../../processed');
+
+async function processImageJob(job) {
+  const { filePath, jobId, targetWidth, targetHeight, targetSizeKb, originalName } = job.data;
+  
+  try {
+    await fs.mkdir(PROCESSED_DIR, { recursive: true });
+
+    job.progress(10); // Starting
+
+    // 1. Read input image and run AI Background Removal
+    const inputBuffer = await fs.readFile(filePath);
+    const inputBlob = new Blob([inputBuffer], { type: 'image/jpeg' });
+    
+    job.progress(30); // AI Model running
+
+    const bgRemovedBlob = await removeBackground(inputBlob);
+    const bgRemovedBuffer = Buffer.from(await bgRemovedBlob.arrayBuffer());
+
+    job.progress(60); // AI done, starting cleanup
+
+    // 2. Perform Connected Component Analysis and Bounding Box Extraction
+    const metadata = await sharp(bgRemovedBuffer).metadata();
+    const { data, info } = await sharp(bgRemovedBuffer)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const width = info.width;
+    const height = info.height;
+    const visited = new Uint8Array(width * height);
+    const blobSizes = [];
+    let currentBlobId = 1;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        const alpha = data[i * 4 + 3];
+        
+        if (alpha > 128 && visited[i] === 0) {
+          let size = 0;
+          const stack = [i];
+          visited[i] = currentBlobId;
+          
+          while (stack.length > 0) {
+            const curr = stack.pop();
+            size++;
+            
+            const cx = curr % width;
+            const cy = Math.floor(curr / width);
+            
+            const neighbors = [
+              cx > 0 ? curr - 1 : -1,
+              cx < width - 1 ? curr + 1 : -1,
+              cy > 0 ? curr - width : -1,
+              cy < height - 1 ? curr + width : -1
+            ];
+            
+            for (const n of neighbors) {
+              if (n !== -1 && visited[n] === 0 && data[n * 4 + 3] > 128) {
+                visited[n] = currentBlobId;
+                stack.push(n);
+              }
+            }
+          }
+          blobSizes.push({ id: currentBlobId, size });
+          currentBlobId++;
+        }
+      }
+    }
+
+    // Find largest blob
+    blobSizes.sort((a, b) => b.size - a.size);
+    const largestBlobId = blobSizes.length > 0 ? blobSizes[0].id : -1;
+
+    // Apply filter and find bounding box of the largest blob
+    let minX = width, minY = height, maxX = 0, maxY = 0;
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        if (visited[i] !== largestBlobId) {
+          // Transparent out noise
+          data[i * 4 + 3] = 0; 
+        } else {
+          // Bounding box of largest blob
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (minX > maxX || minY > maxY) {
+      minX = 0; minY = 0; maxX = width; maxY = height;
+    }
+
+    const cropWidth = maxX - minX;
+    const cropHeight = maxY - minY;
+
+    // 3. Re-create clean image
+    const cleanedBuffer = await sharp(data, {
+      raw: { width, height, channels: 4 }
+    })
+      .extract({ left: minX, top: minY, width: cropWidth, height: cropHeight })
+      .toBuffer();
+
+    job.progress(80); // Formatting output
+
+    // 4. Fit into target canvas
+    // Leave padding around the sides and top, anchor to bottom
+    const outWidth = targetWidth || 600;
+    const outHeight = targetHeight || 800;
+    
+    const paddingX = outWidth * 0.15;
+    const paddingTop = outHeight * 0.08;
+    const availableW = outWidth - paddingX;
+    const availableH = outHeight - paddingTop;
+
+    const scale = Math.min(availableW / cropWidth, availableH / cropHeight);
+    const drawW = Math.round(cropWidth * scale);
+    const drawH = Math.round(cropHeight * scale);
+    
+    // We create a white background of target dimensions, and composite the resized subject on top
+    const resizedSubject = await sharp(cleanedBuffer)
+      .resize(drawW, drawH, { fit: 'fill' })
+      .toBuffer();
+
+    const finalX = Math.round((outWidth - drawW) / 2);
+    const finalY = outHeight - drawH; // Anchor strictly to bottom
+
+    let quality = 90;
+    let finalBuffer;
+    const maxBytes = (targetSizeKb || 20) * 1024;
+
+    // Try to compress
+    for (let attempts = 0; attempts < 5; attempts++) {
+      finalBuffer = await sharp({
+        create: {
+          width: outWidth,
+          height: outHeight,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 }
+        }
+      })
+      .composite([{ input: resizedSubject, top: finalY, left: finalX }])
+      .jpeg({ quality, mozjpeg: true })
+      .toBuffer();
+
+      if (finalBuffer.length <= maxBytes) {
+        break; // found good size
+      }
+      quality = Math.max(10, quality - 20); // aggressively reduce quality
+    }
+
+    // Save final
+    const finalPath = path.join(PROCESSED_DIR, `${jobId}_${path.basename(filePath)}`);
+    await fs.writeFile(finalPath, finalBuffer);
+
+    // Clean up original upload
+    await fs.unlink(filePath).catch(() => {});
+
+    // Update database
+    await query(
+      `UPDATE job_files SET status = 'completed', processed_path = $1, processed_size_bytes = $2 WHERE id = $3`,
+      [finalPath, finalBuffer.length, fileId]
+    );
+
+    job.progress(100);
+    return { finalPath, originalName, size: finalBuffer.length };
+
+  } catch (err) {
+    console.error(`Error processing job ${job.id}:`, err);
+    await query(`UPDATE job_files SET status = 'failed', error_message = $1 WHERE id = $2`, [err.message, fileId]);
+    throw err;
+  }
+}
+
+imageQueue.process(2, processImageJob); // Process 2 images concurrently
+
+module.exports = { imageQueue, PROCESSED_DIR };
