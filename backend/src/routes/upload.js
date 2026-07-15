@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const { authenticate } = require('../middleware/auth');
-const { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload } = require('../controllers/uploadController');
+const { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload, deleteJob } = require('../controllers/uploadController');
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 const uploadLimiter = rateLimit({
