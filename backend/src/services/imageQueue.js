@@ -49,11 +49,15 @@ async function processImageJob(job) {
 
 async function processImageBuffer(filePath, targetWidth, targetHeight, targetSizeKb, reportProgress = () => {}) {
   // 1. Read input image and run AI Background Removal
-  const inputBuffer = await fs.readFile(filePath);
+  const fileUrl = 'file://' + filePath.replace(/\\/g, '/');
   
   let bgRemovedBlob;
   try {
-    bgRemovedBlob = await removeBackground(inputBuffer);
+    const config = {
+      publicPath: 'file://' + path.join(__dirname, '../../node_modules/@imgly/background-removal-node/dist/').replace(/\\/g, '/'),
+      debug: false
+    };
+    bgRemovedBlob = await removeBackground(fileUrl, config);
   } catch (err) {
     console.error("AI Background Removal threw an error:", err);
     throw new Error("AI engine failed to process the image. Please try a different photo.");

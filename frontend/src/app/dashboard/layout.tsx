@@ -10,8 +10,7 @@ import {
 import { useAuthStore } from '@/store/authStore';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/upload', label: 'Upload Photos', icon: Upload },
+  { href: '/dashboard', label: 'Workspace', icon: LayoutDashboard },
   { href: '/dashboard/jobs', label: 'My Jobs', icon: FolderOpen },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];

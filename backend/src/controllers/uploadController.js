@@ -222,13 +222,13 @@ const listJobs = async (req, res) => {
       `SELECT id, status, total_files, processed_files, failed_files,
               zip_url, zip_expires_at, created_at, updated_at
        FROM jobs
-       WHERE user_id = $1
+       WHERE user_id = $1 AND zip_expires_at > NOW()
        ORDER BY created_at DESC
        LIMIT $2 OFFSET $3`,
       [req.user.id, parseInt(limit), offset]
     );
 
-    const countResult = await query(`SELECT COUNT(*) FROM jobs WHERE user_id = $1`, [req.user.id]);
+    const countResult = await query(`SELECT COUNT(*) FROM jobs WHERE user_id = $1 AND zip_expires_at > NOW()`, [req.user.id]);
 
     return res.json({
       jobs: result.rows,
@@ -236,6 +236,32 @@ const listJobs = async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+};
+
+// ─── Delete Job ───────────────────────────────────────────────────────────────
+const deleteJob = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await query(`SELECT * FROM jobs WHERE id = $1 AND user_id = $2`, [id, req.user.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    // Delete from DB (cascade handles job_files if set up, otherwise we should delete files too)
+    await query(`DELETE FROM job_files WHERE job_id = $1`, [id]);
+    await query(`DELETE FROM jobs WHERE id = $1`, [id]);
+
+    // Cleanup ZIPs
+    const zipPath = path.join(ZIPS_DIR, `${id}.zip`);
+    const jpegPath = path.join(ZIPS_DIR, `${id}.jpeg`);
+    await fs.unlink(zipPath).catch(() => {});
+    await fs.unlink(jpegPath).catch(() => {});
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Delete job error:', err);
+    return res.status(500).json({ error: 'Failed to delete job' });
   }
 };
 
@@ -318,5 +344,5 @@ const guestUpload = async (req, res) => {
   }
 };
 
-module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload };
+module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload, deleteJob };
 

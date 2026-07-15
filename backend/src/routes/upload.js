@@ -24,6 +24,7 @@ const guestLimiter = rateLimit({
 router.post('/batch', authenticate, uploadLimiter, upload.array('images', 100), uploadBatch);
 router.get('/jobs', authenticate, listJobs);
 router.get('/job/:id', authenticate, getJobStatus);
+router.delete('/job/:id', authenticate, deleteJob);
 router.get('/download/:id', authenticate, downloadZip);
 
 // ─── Guest route (no auth, 1 image only) ─────────────────────────────────────
