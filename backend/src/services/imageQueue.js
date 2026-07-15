@@ -52,7 +52,7 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   let bgRemovedBlob;
   try {
     const config = {
-      model: "small",
+      model: "medium",
       debug: false
     };
     const buffer = await fs.readFile(filePath);
@@ -203,6 +203,6 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   return finalBuffer;
 }
 
-imageQueue.process(1, processImageJob);
+imageQueue.process(2, processImageJob);
 
 module.exports = { imageQueue, PROCESSED_DIR, processImageBuffer };
