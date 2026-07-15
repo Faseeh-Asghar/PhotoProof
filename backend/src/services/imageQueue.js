@@ -49,15 +49,15 @@ async function processImageJob(job) {
 
 async function processImageBuffer(filePath, targetWidth, targetHeight, targetSizeKb, reportProgress = () => {}) {
   // 1. Read input image and run AI Background Removal
-  const fileUrl = 'file://' + filePath.replace(/\\/g, '/');
-  
   let bgRemovedBlob;
   try {
     const config = {
       model: "small",
       debug: false
     };
-    bgRemovedBlob = await removeBackground(fileUrl, config);
+    const buffer = await fs.readFile(filePath);
+    const blob = new Blob([buffer]);
+    bgRemovedBlob = await removeBackground(blob, config);
   } catch (err) {
     console.error("AI Background Removal threw an error:", err);
     throw new Error(`AI engine failed: ${err.message || err}`);

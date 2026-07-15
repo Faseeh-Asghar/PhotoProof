@@ -219,11 +219,16 @@ const listJobs = async (req, res) => {
 
   try {
     const result = await query(
-      `SELECT id, status, total_files, processed_files, failed_files,
-              zip_url, zip_expires_at, created_at, updated_at
-       FROM jobs
-       WHERE user_id = $1 AND zip_expires_at > NOW()
-       ORDER BY created_at DESC
+      `SELECT j.id, j.status, j.total_files, j.processed_files, j.failed_files,
+              j.zip_url, j.zip_expires_at, j.created_at, j.updated_at,
+              (
+                SELECT json_agg(json_build_object('name', jf.original_name, 'error', jf.error_message))
+                FROM job_files jf 
+                WHERE jf.job_id = j.id AND jf.status = 'failed'
+              ) as failed_details
+       FROM jobs j
+       WHERE j.user_id = $1 AND j.zip_expires_at > NOW()
+       ORDER BY j.created_at DESC
        LIMIT $2 OFFSET $3`,
       [req.user.id, parseInt(limit), offset]
     );

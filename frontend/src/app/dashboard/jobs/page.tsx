@@ -165,6 +165,21 @@ export default function JobsPage() {
                     </div>
                   </div>
                 )}
+                
+                {job.failed_files > 0 && (job as any).failed_details && (
+                  <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 8 }}>
+                    <h4 style={{ color: '#EF4444', fontSize: '0.85rem', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      Error Details
+                    </h4>
+                    <ul style={{ color: '#FCA5A5', fontSize: '0.8rem', paddingLeft: 16, margin: 0, fontFamily: 'monospace' }}>
+                      {(job as any).failed_details.map((fail: any, idx: number) => (
+                        <li key={idx} style={{ marginBottom: 4 }}>
+                          <span style={{ color: '#94A3B8' }}>{fail.name}:</span> {fail.error || 'Unknown error'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </motion.div>
             ))}
           </div>
