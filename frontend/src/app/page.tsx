@@ -242,7 +242,7 @@ function GuestUploadWidget() {
         </>
       )}
 
-      {trialStatus === 'approved' && resultUrl && (
+      {resultUrl && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <div style={{ display: 'flex', gap: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
             <div style={{ textAlign: 'center' }}>
