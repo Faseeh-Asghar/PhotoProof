@@ -206,10 +206,15 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   const cropWidth = maxX - minX;
   const cropHeight = maxY - minY;
 
+  // NOTE: explicit .png() here is required. Without it, encoding a buffer built
+  // from raw pixel data doesn't reliably default to a real, auto-detectable PNG,
+  // which caused the next sharp() call below to fail with
+  // "Input buffer contains unsupported image format".
   const cleanedBuffer = await sharp(data, {
     raw: { width, height, channels: 4 }
   })
     .extract({ left: minX, top: minY, width: cropWidth, height: cropHeight })
+    .png()
     .toBuffer();
 
   reportProgress(80);
