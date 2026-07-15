@@ -5,25 +5,40 @@ const sharp = require('sharp');
 const { removeBackground } = require('@imgly/background-removal-node');
 const { query } = require('../db');
 
-const imageQueue = new Queue('image-processing', {
-  redis: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: process.env.REDIS_PORT || 6379,
-  },
+// Bull accepts a full Redis connection string directly. Our deploy configs
+// (Render/Upstash) only ever set REDIS_URL, not REDIS_HOST/REDIS_PORT, so we
+// must use that here or Bull silently falls back to 127.0.0.1:6379 and the
+// queue never actually connects (jobs get created in the DB but never run).
+const redisConnection = process.env.REDIS_URL
+  ? process.env.REDIS_URL
+  : {
+      redis: {
+        host: process.env.REDIS_HOST || '127.0.0.1',
+        port: process.env.REDIS_PORT || 6379,
+      },
+    };
+
+const imageQueue = new Queue(
+  'image-processing',
+  typeof redisConnection === 'string' ? redisConnection : redisConnection
+);
+
+imageQueue.on('error', (err) => {
+  console.error('❌ Redis/Queue connection error:', err.message);
 });
 
 const PROCESSED_DIR = path.join(__dirname, '../../processed');
 
 async function processImageJob(job) {
   const { fileId, filePath, jobId, targetWidth, targetHeight, targetSizeKb, originalName } = job.data;
-  
+
   try {
     await fs.mkdir(PROCESSED_DIR, { recursive: true });
 
     job.progress(10); // Starting
 
     const finalBuffer = await processImageBuffer(filePath, targetWidth, targetHeight, targetSizeKb, (progress) => job.progress(progress));
-    
+
     // Save final
     const finalPath = path.join(PROCESSED_DIR, `${jobId}_${path.basename(filePath)}`);
     await fs.writeFile(finalPath, finalBuffer);
@@ -48,17 +63,36 @@ async function processImageJob(job) {
 }
 
 async function processImageBuffer(filePath, targetWidth, targetHeight, targetSizeKb, reportProgress = () => {}) {
-  // 1. Read input image and run AI Background Removal
+  // 1. Normalize the input through Sharp first. Uploads can be HEIC/TIFF/BMP/etc
+  //    (allowed by multer's file filter), but @imgly/background-removal-node's own
+  //    internal decoder only reliably handles JPEG/PNG/WebP and throws
+  //    "Unsupported format:" on anything else. Re-encoding through Sharp (which has
+  //    far broader format support) guarantees the AI engine always gets a clean JPEG.
+  let normalizedInputBuffer;
+  try {
+    normalizedInputBuffer = await sharp(filePath)
+      .rotate()
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
+      .jpeg({ quality: 95 })
+      .toBuffer();
+  } catch (err) {
+    throw new Error(`Could not read/normalize input image: ${err.message}`);
+  }
+
+  // 2. Run AI Background Removal, requesting raw RGBA output instead of PNG.
+  //    The library's built-in PNG encoder (used for default "image/png" output)
+  //    produces files Sharp's decoder rejects with "Input buffer contains
+  //    unsupported image format" on this server/library combo. "image/x-rgba8"
+  //    returns uncompressed raw pixels instead (width/height in the MIME params),
+  //    which avoids the broken encode/decode round-trip entirely.
   let bgRemovedBlob;
   try {
     const config = {
       model: "medium",
-      debug: false
+      debug: false,
+      output: { format: "image/x-rgba8" },
     };
-    const buffer = await fs.readFile(filePath);
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-    const blob = new Blob([buffer], { type: mimeType });
+    const blob = new Blob([normalizedInputBuffer], { type: 'image/jpeg' });
     bgRemovedBlob = await removeBackground(blob, config);
   } catch (err) {
     console.error("AI Background Removal threw an error:", err);
@@ -69,7 +103,6 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   const bgRemovedBuffer = Buffer.from(arrayBuf);
   console.log('AI Output type:', bgRemovedBlob.type);
   console.log('AI Output Buffer length:', bgRemovedBuffer.length);
-  console.log('AI Output Buffer string:', bgRemovedBuffer.slice(0, 100).toString('utf8'));
 
   if (bgRemovedBuffer.length < 100) {
     throw new Error("AI engine returned an empty output. This may be due to low server memory or a corrupted input file.");
@@ -77,16 +110,27 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
 
   reportProgress(60);
 
+  // Raw RGBA output encodes width/height in the mime type, e.g.
+  // "image/x-rgba8;width=600;height=800" - parse them back out.
+  const mimeMatch = bgRemovedBlob.type.match(/width=(\d+).*height=(\d+)/);
+  if (!mimeMatch) {
+    throw new Error(`AI engine returned unexpected output type: ${bgRemovedBlob.type}`);
+  }
+  const rawWidth = parseInt(mimeMatch[1], 10);
+  const rawHeight = parseInt(mimeMatch[2], 10);
+
   let data, info;
   try {
-    const sharpOutput = await sharp(bgRemovedBuffer)
+    const sharpOutput = await sharp(bgRemovedBuffer, {
+      raw: { width: rawWidth, height: rawHeight, channels: 4 },
+    })
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
     data = sharpOutput.data;
     info = sharpOutput.info;
-  } catch(err) {
-    throw new Error(`Sharp failed. Buffer len: ${bgRemovedBuffer.length}, type: ${bgRemovedBlob.type}, start: ${bgRemovedBuffer.slice(0, 30).toString('utf8')}. Error: ${err.message}`);
+  } catch (err) {
+    throw new Error(`Sharp failed on raw AI output. width=${rawWidth} height=${rawHeight} bufferLen=${bgRemovedBuffer.length}. Error: ${err.message}`);
   }
 
   const width = info.width;
@@ -99,26 +143,26 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
       const alpha = data[i * 4 + 3];
-      
+
       if (alpha > 128 && visited[i] === 0) {
         let size = 0;
         const stack = [i];
         visited[i] = currentBlobId;
-        
+
         while (stack.length > 0) {
           const curr = stack.pop();
           size++;
-          
+
           const cx = curr % width;
           const cy = Math.floor(curr / width);
-          
+
           const neighbors = [
             cx > 0 ? curr - 1 : -1,
             cx < width - 1 ? curr + 1 : -1,
             cy > 0 ? curr - width : -1,
             cy < height - 1 ? curr + width : -1
           ];
-          
+
           for (const n of neighbors) {
             if (n !== -1 && visited[n] === 0 && data[n * 4 + 3] > 128) {
               visited[n] = currentBlobId;
@@ -140,12 +184,12 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   }
 
   let minX = width, minY = height, maxX = 0, maxY = 0;
-  
+
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
       if (visited[i] !== largestBlobId) {
-        data[i * 4 + 3] = 0; 
+        data[i * 4 + 3] = 0;
       } else {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
@@ -172,7 +216,7 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
 
   const outWidth = targetWidth || 600;
   const outHeight = targetHeight || 800;
-  
+
   const paddingX = outWidth * 0.15;
   const paddingTop = outHeight * 0.08;
   const availableW = outWidth - paddingX;
@@ -181,7 +225,7 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
   const scale = Math.min(availableW / cropWidth, availableH / cropHeight);
   const drawW = Math.round(cropWidth * scale);
   const drawH = Math.round(cropHeight * scale);
-  
+
   const resizedSubject = await sharp(cleanedBuffer)
     .resize(drawW, drawH, { fit: 'fill' })
     .toBuffer();
