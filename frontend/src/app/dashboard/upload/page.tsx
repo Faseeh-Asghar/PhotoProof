@@ -232,44 +232,46 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* Drop Zone */}
-      <div
-        {...getRootProps()}
-        style={{
-          border: `2px dashed ${isDragActive ? 'rgba(79,70,229,0.8)' : 'rgba(79,70,229,0.3)'}`,
-          borderRadius: 20,
-          padding: '48px 32px',
-          textAlign: 'center',
-          cursor: 'pointer',
-          background: isDragActive ? 'rgba(79,70,229,0.08)' : 'rgba(79,70,229,0.03)',
-          transition: 'all 250ms',
-          marginBottom: 28,
-        }}
-      >
-        <input {...getInputProps()} id="file-upload-input" />
-        <motion.div animate={{ y: isDragActive ? -8 : 0 }} transition={{ duration: 0.2 }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: 18,
-            background: isDragActive ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'rgba(79,70,229,0.12)',
-            border: '1px solid rgba(79,70,229,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px',
+      {/* Drop Zone (Only when empty) */}
+      {files.length === 0 && (
+        <div
+          {...getRootProps()}
+          style={{
+            border: `2px dashed ${isDragActive ? 'rgba(79,70,229,0.8)' : 'rgba(79,70,229,0.3)'}`,
+            borderRadius: 20,
+            padding: '48px 32px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            background: isDragActive ? 'rgba(79,70,229,0.08)' : 'rgba(79,70,229,0.03)',
             transition: 'all 250ms',
-          }}>
-            <Upload size={30} color={isDragActive ? 'white' : '#818CF8'} />
-          </div>
-          <h3 style={{ marginBottom: 8, color: isDragActive ? '#F1F5F9' : '#94A3B8', fontSize: '1.05rem' }}>
-            {isDragActive ? 'Drop your photos here!' : 'Drag & drop photos here'}
-          </h3>
-          <p style={{ color: '#475569', fontSize: '0.875rem', marginBottom: 16 }}>
-            or click to select files
-          </p>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#141B2D', borderRadius: 8, padding: '6px 14px' }}>
-            <FileImage size={13} color="#64748B" />
-            <span style={{ color: '#64748B', fontSize: '0.78rem' }}>JPG, PNG, WEBP, BMP · Max 20MB each · Up to 100 files</span>
-          </div>
-        </motion.div>
-      </div>
+            marginBottom: 28,
+          }}
+        >
+          <input {...getInputProps()} id="file-upload-input" />
+          <motion.div animate={{ y: isDragActive ? -8 : 0 }} transition={{ duration: 0.2 }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: 18,
+              background: isDragActive ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'rgba(79,70,229,0.12)',
+              border: '1px solid rgba(79,70,229,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 20px',
+              transition: 'all 250ms',
+            }}>
+              <Upload size={30} color={isDragActive ? 'white' : '#818CF8'} />
+            </div>
+            <h3 style={{ marginBottom: 8, color: isDragActive ? '#F1F5F9' : '#94A3B8', fontSize: '1.05rem' }}>
+              {isDragActive ? 'Drop your photos here!' : 'Drag & drop photos here'}
+            </h3>
+            <p style={{ color: '#475569', fontSize: '0.875rem', marginBottom: 16 }}>
+              or click to select files
+            </p>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#141B2D', borderRadius: 8, padding: '6px 14px' }}>
+              <FileImage size={13} color="#64748B" />
+              <span style={{ color: '#64748B', fontSize: '0.78rem' }}>JPG, PNG, WEBP, BMP · Max 20MB each · Up to 100 files</span>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* File Grid */}
       <AnimatePresence>
@@ -364,9 +366,6 @@ export default function UploadPage() {
                         <span style={{ color: '#94A3B8', fontSize: '0.7rem' }}>
                           {targetWidth}x{targetHeight}
                         </span>
-                        <a href={f.processedPreview} download={f.customName} title="Download individual JPEG">
-                          <Download size={14} color="#818CF8" style={{ cursor: 'pointer' }} />
-                        </a>
                       </div>
                     ) : (
                       <span style={{ color: '#64748B', fontSize: '0.7rem' }}>
@@ -376,6 +375,26 @@ export default function UploadPage() {
                   </div>
                 </motion.div>
               ))}
+
+              {/* Add More Photos Box */}
+              {!uploading && !job && (
+                <div
+                  {...getRootProps()}
+                  style={{
+                    borderRadius: 10,
+                    border: '2px dashed rgba(79,70,229,0.4)',
+                    background: isDragActive ? 'rgba(79,70,229,0.1)' : 'rgba(79,70,229,0.03)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer',
+                    minHeight: 180,
+                    transition: 'all 200ms'
+                  }}
+                >
+                  <input {...getInputProps()} id="file-upload-add-more" />
+                  <Upload size={24} color="#818CF8" style={{ marginBottom: 8 }} />
+                  <span style={{ color: '#818CF8', fontSize: '0.8rem', fontWeight: 600 }}>Add More</span>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
