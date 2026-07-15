@@ -165,7 +165,7 @@ export default function DashboardPage() {
             const serverFile = st.files.find((sf: any) => sf.originalName === f.file.name);
             if (serverFile) {
               if (serverFile.status === 'completed') {
-                const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+                const baseUrl = '';
                 return { 
                   ...f, 
                   status: 'done',
