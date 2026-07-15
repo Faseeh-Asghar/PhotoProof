@@ -30,7 +30,7 @@ interface JobResult {
 
 export default function UploadPage() {
   useEffect(() => {
-    preloadAI();
+    // AI is now handled by the backend
   }, []);
 
   const [files, setFiles] = useState<FileItem[]>([]);
