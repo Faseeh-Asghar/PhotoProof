@@ -47,8 +47,6 @@ async function processImageJob(job) {
   }
 }
 
-}
-
 async function processImageBuffer(filePath, targetWidth, targetHeight, targetSizeKb, reportProgress = () => {}) {
   // 1. Read input image and run AI Background Removal
   const inputBuffer = await fs.readFile(filePath);
