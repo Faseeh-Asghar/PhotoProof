@@ -144,6 +144,17 @@ export default function UploadPage() {
         
         setUploadPct(50 + Math.round(st.progress / 2));
         
+        if (st.files) {
+          setFiles(prev => prev.map(f => {
+            const serverFile = st.files.find((sf: any) => sf.originalName === f.file.name);
+            if (serverFile) {
+              if (serverFile.status === 'completed') return { ...f, status: 'done' };
+              if (serverFile.status === 'failed') return { ...f, status: 'error' };
+            }
+            return f;
+          }));
+        }
+        
         if (st.status === 'completed' || st.status === 'partial') {
           setJob({
             jobId,

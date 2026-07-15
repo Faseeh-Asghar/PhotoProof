@@ -258,14 +258,14 @@ const downloadZip = async (req, res) => {
       return res.status(410).json({ error: 'Download link has expired' });
     }
 
-    let filePath = require('path').join(ZIPS_DIR, `${id}.png`);
-    let isPng = true;
+    let filePath = require('path').join(ZIPS_DIR, `${id}.jpeg`);
+    let isJpeg = true;
     
     try {
       await fs.access(filePath);
     } catch {
-      // If PNG not found, fallback to ZIP
-      isPng = false;
+      // If JPEG not found, fallback to ZIP
+      isJpeg = false;
       filePath = require('path').join(ZIPS_DIR, `${id}.zip`);
       try {
         await fs.access(filePath);
@@ -274,9 +274,9 @@ const downloadZip = async (req, res) => {
       }
     }
 
-    const filename = `photoproof_${new Date(job.created_at).toISOString().split('T')[0]}_${id.slice(0, 8)}${isPng ? '.png' : '.zip'}`;
+    const filename = `photoproof_${new Date(job.created_at).toISOString().split('T')[0]}_${id.slice(0, 8)}${isJpeg ? '.jpeg' : '.zip'}`;
 
-    res.setHeader('Content-Type', isPng ? 'image/png' : 'application/zip');
+    res.setHeader('Content-Type', isJpeg ? 'image/jpeg' : 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
     const fileStream = require('fs').createReadStream(filePath);
