@@ -292,16 +292,23 @@ const guestUpload = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image uploaded.' });
   }
-  
-  res.setHeader('Content-Type', 'image/jpeg');
-  res.setHeader('Content-Disposition', `attachment; filename="photoproof_guest_${Date.now()}.jpg"`);
-  
-  const fileStream = require('fs').createReadStream(req.file.path);
-  fileStream.pipe(res);
-  
-  fileStream.on('close', () => {
+
+  const { processImageBuffer } = require('../services/imageQueue');
+
+  try {
+    const finalBuffer = await processImageBuffer(req.file.path, 600, 800, 20);
+    
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Disposition', `attachment; filename="photoproof_guest_${Date.now()}.jpg"`);
+    
+    res.send(finalBuffer);
+  } catch (err) {
+    console.error('Guest upload error:', err);
+    res.status(500).json({ error: 'Processing failed.' });
+  } finally {
+    const fs = require('fs').promises;
     fs.unlink(req.file.path).catch(console.error);
-  });
+  }
 };
 
 module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload };

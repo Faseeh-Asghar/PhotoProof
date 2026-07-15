@@ -147,22 +147,12 @@ function GuestUploadWidget() {
       
       const rawFile = blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file;
 
-      // 2. Upload to server
-      const res = await uploadApi.batch([rawFile], { width: 600, height: 800, sizeKb: 20 });
-      const { jobId } = res.data;
-
-      // 3. Poll for completion
+      // 2. Upload to server (sync processing for guest)
       setProgressMsg('AI Processing on server...');
-      let isDone = false;
-      while (!isDone) {
-        await new Promise(r => setTimeout(r, 2000));
-        const stRes = await uploadApi.jobStatus(jobId);
-        const st = stRes.data;
-        if (st.status === 'completed' || st.status === 'partial') {
-           setResultUrl(uploadApi.downloadUrl(jobId));
-           isDone = true;
-        }
-      }
+      const res = await uploadApi.guestUpload(rawFile);
+      
+      const url = URL.createObjectURL(res.data);
+      setResultUrl(url);
       
       localStorage.setItem('guest_uses', (uses + 1).toString());
       toast.success('✅ Photo processed flawlessly!');
