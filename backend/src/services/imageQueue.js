@@ -15,7 +15,7 @@ const imageQueue = new Queue('image-processing', {
 const PROCESSED_DIR = path.join(__dirname, '../../processed');
 
 async function processImageJob(job) {
-  const { filePath, jobId, targetWidth, targetHeight, targetSizeKb, originalName } = job.data;
+  const { fileId, filePath, jobId, targetWidth, targetHeight, targetSizeKb, originalName } = job.data;
   
   try {
     await fs.mkdir(PROCESSED_DIR, { recursive: true });
