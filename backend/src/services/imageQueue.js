@@ -56,7 +56,9 @@ async function processImageBuffer(filePath, targetWidth, targetHeight, targetSiz
       debug: false
     };
     const buffer = await fs.readFile(filePath);
-    const blob = new Blob([buffer]);
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+    const blob = new Blob([buffer], { type: mimeType });
     bgRemovedBlob = await removeBackground(blob, config);
   } catch (err) {
     console.error("AI Background Removal threw an error:", err);
