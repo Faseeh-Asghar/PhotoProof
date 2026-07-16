@@ -162,7 +162,7 @@ export default function DashboardPage() {
         
         if (st.files) {
           setFiles(prev => prev.map(f => {
-            const serverFile = st.files.find((sf: any) => sf.originalName === f.file.name);
+            const serverFile = st.files.find((sf: any) => sf.originalName === f.customName);
             if (serverFile) {
               if (serverFile.status === 'completed') {
                 const baseUrl = '';
@@ -322,8 +322,8 @@ export default function DashboardPage() {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-              gap: 16,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+              gap: 12,
               marginBottom: 28,
               maxHeight: 400,
               overflowY: 'auto',
