@@ -152,6 +152,8 @@ export default function DashboardPage() {
       const { jobId } = res.data;
 
       setStatusMsg('AI processing on server...');
+      setFiles(prev => prev.map(f => ({ ...f, status: 'processing' })));
+      
       let isDone = false;
       while (!isDone) {
         await new Promise(r => setTimeout(r, 2000));
@@ -161,8 +163,8 @@ export default function DashboardPage() {
         setUploadPct(50 + Math.round(st.progress / 2));
         
         if (st.files) {
-          setFiles(prev => prev.map(f => {
-            const serverFile = st.files.find((sf: any) => sf.originalName === f.customName);
+          setFiles(prev => prev.map((f, index) => {
+            const serverFile = st.files[index] || st.files.find((sf: any) => sf.originalName === f.customName || sf.originalName === f.file.name);
             if (serverFile) {
               if (serverFile.status === 'completed') {
                 const baseUrl = '';
@@ -229,17 +231,17 @@ export default function DashboardPage() {
   return (
     <div>
       {/* Header & Simple Quota */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
         <div>
-          <h1 style={{ fontSize: '1.75rem', marginBottom: 4 }}>
+          <h1 className="text-xl md:text-3xl font-bold mb-1">
             Welcome back, {user?.name?.split(' ')[0]} 👋
           </h1>
-          <p style={{ color: '#64748B' }}>Upload photos below to remove their background.</p>
+          <p className="text-sm md:text-base text-slate-500">Upload photos below to remove their background.</p>
         </div>
-        <div style={{ background: '#141B2D', padding: '12px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
-          <span style={{ color: '#94A3B8', fontSize: '0.85rem', display: 'block', marginBottom: 2 }}>Monthly Quota</span>
-          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#F1F5F9' }}>
-            {user?.imagesProcessed} <span style={{ color: '#64748B', fontWeight: 500 }}>/ {user?.quotaLimit}</span>
+        <div className="bg-slate-900 px-4 py-2 md:px-5 md:py-3 rounded-xl border border-white/5 flex flex-row md:flex-col items-center md:items-start justify-between">
+          <span className="text-slate-400 text-xs md:text-sm block">Monthly Quota</span>
+          <span className="text-lg md:text-xl font-bold text-slate-100">
+            {user?.imagesProcessed} <span className="text-slate-500 font-medium">/ {user?.quotaLimit}</span>
           </span>
         </div>
       </div>
@@ -250,18 +252,18 @@ export default function DashboardPage() {
           <Zap size={18} color="#818CF8" /> Output Settings
         </h3>
         
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-          <div style={{ flex: '1 1 200px' }}>
-            <label style={{ display: 'block', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>Dimensions (W x H)</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-               <input type="number" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center', minWidth: 60 }} placeholder="W" />
-               <span style={{ color: '#64748B', alignSelf: 'center' }}>x</span>
-               <input type="number" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center', minWidth: 60 }} placeholder="H" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block mb-2 text-slate-400 text-xs sm:text-sm">Dimensions (W x H)</label>
+            <div className="flex gap-2">
+               <input type="number" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} className="flex-1 p-2 rounded-lg border border-white/10 bg-black/30 text-slate-100 text-center min-w-[60px]" placeholder="W" />
+               <span className="text-slate-500 self-center">x</span>
+               <input type="number" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} className="flex-1 p-2 rounded-lg border border-white/10 bg-black/30 text-slate-100 text-center min-w-[60px]" placeholder="H" />
             </div>
           </div>
-          <div style={{ flex: '0 1 160px' }}>
-            <label style={{ display: 'block', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>Max File Size (KB)</label>
-            <input type="number" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center' }} placeholder="KB" />
+          <div>
+            <label className="block mb-2 text-slate-400 text-xs sm:text-sm">Max File Size (KB)</label>
+            <input type="number" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} className="w-full p-2 rounded-lg border border-white/10 bg-black/30 text-slate-100 text-center" placeholder="KB" />
           </div>
         </div>
       </div>
