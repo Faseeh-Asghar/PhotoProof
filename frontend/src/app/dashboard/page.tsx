@@ -250,18 +250,18 @@ export default function DashboardPage() {
           <Zap size={18} color="#818CF8" /> Output Settings
         </h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-          <div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ flex: '1 1 200px' }}>
             <label style={{ display: 'block', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>Dimensions (W x H)</label>
             <div style={{ display: 'flex', gap: 8 }}>
-               <input type="number" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center' }} placeholder="W" />
+               <input type="number" value={targetWidth} onChange={(e) => setTargetWidth(Number(e.target.value))} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center', minWidth: 60 }} placeholder="W" />
                <span style={{ color: '#64748B', alignSelf: 'center' }}>x</span>
-               <input type="number" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center' }} placeholder="H" />
+               <input type="number" value={targetHeight} onChange={(e) => setTargetHeight(Number(e.target.value))} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center', minWidth: 60 }} placeholder="H" />
             </div>
           </div>
-          <div>
+          <div style={{ flex: '0 1 160px' }}>
             <label style={{ display: 'block', marginBottom: 8, color: '#94A3B8', fontSize: '0.85rem' }}>Max File Size (KB)</label>
-            <input type="number" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center' }} placeholder="Custom KB" />
+            <input type="number" value={targetSizeKb} onChange={(e) => setTargetSizeKb(Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', textAlign: 'center' }} placeholder="KB" />
           </div>
         </div>
       </div>
@@ -341,7 +341,7 @@ export default function DashboardPage() {
                     <img
                       src={f.processedPreview || f.preview}
                       alt={f.file.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000000' }}
                     />
                     
                     {f.status === 'processing' && (
@@ -429,6 +429,29 @@ export default function DashboardPage() {
             <><ImageIcon2 size={18} /> Process Photos</>
           )}
         </motion.button>
+      )}
+
+      {/* Download Result Box */}
+      {jobResult && jobResult.downloadUrl && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{ marginBottom: 32, padding: 24, background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 16, textAlign: 'center' }}
+        >
+          <CheckCircle size={40} color="#10B981" style={{ margin: '0 auto 16px' }} />
+          <h3 style={{ fontSize: '1.25rem', color: '#F1F5F9', marginBottom: 8 }}>Processing Complete!</h3>
+          <p style={{ color: '#94A3B8', marginBottom: 20 }}>
+            Successfully processed {jobResult.processedFiles} of {jobResult.totalFiles} photos.
+          </p>
+          <a
+            href={jobResult.downloadUrl}
+            target="_blank" rel="noreferrer"
+            className="btn btn-primary btn-lg"
+            style={{ display: 'inline-flex', background: '#10B981', color: '#000', border: 'none', gap: 8, fontWeight: 700 }}
+          >
+            <Download size={20} /> Download All as ZIP
+          </a>
+        </motion.div>
       )}
 
       {/* Upload Progress Bar */}
