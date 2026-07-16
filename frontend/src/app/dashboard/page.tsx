@@ -350,9 +350,28 @@ export default function DashboardPage() {
                       </div>
                     )}
                     {f.status === 'done' && (
-                      <div style={{ position: 'absolute', top: 4, left: 4, background: '#10B981', borderRadius: '50%', padding: 2 }}>
-                        <CheckCircle size={14} color="white" />
-                      </div>
+                      <>
+                        <div style={{ position: 'absolute', top: 4, left: 4, background: '#10B981', borderRadius: '50%', padding: 2 }}>
+                          <CheckCircle size={14} color="white" />
+                        </div>
+                        {f.processedPreview && (
+                          <a
+                            href={f.processedPreview}
+                            download={f.customName}
+                            target="_blank" rel="noreferrer"
+                            style={{
+                              position: 'absolute', top: 4, right: 4,
+                              background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.2)',
+                              borderRadius: '50%', width: 24, height: 24,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', color: '#10B981', textDecoration: 'none'
+                            }}
+                            title="Download Photo"
+                          >
+                            <Download size={12} />
+                          </a>
+                        )}
+                      </>
                     )}
                     {f.status === 'error' && (
                       <div style={{ position: 'absolute', top: 4, left: 4, background: '#EF4444', borderRadius: '50%', padding: 2 }}>
@@ -444,7 +463,7 @@ export default function DashboardPage() {
             Successfully processed {jobResult.processedFiles} of {jobResult.totalFiles} photos.
           </p>
           <a
-            href={jobResult.downloadUrl}
+            href={uploadApi.downloadUrl(jobResult.jobId)}
             target="_blank" rel="noreferrer"
             className="btn btn-primary btn-lg"
             style={{ display: 'inline-flex', background: '#10B981', color: '#000', border: 'none', gap: 8, fontWeight: 700 }}
