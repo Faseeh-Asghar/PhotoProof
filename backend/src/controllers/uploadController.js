@@ -61,6 +61,9 @@ const uploadBatch = async (req, res) => {
   }
 
   const filesToProcess = req.files.slice(0, Math.min(req.files.length, remaining));
+  // Clean up any files that exceed quota so they don't orphan on disk
+  const filesToDrop = req.files.slice(Math.min(req.files.length, remaining));
+  for (const f of filesToDrop) { await fs.unlink(f.path).catch(() => {}); }
   const jobId = uuidv4();
 
   try {
@@ -166,7 +169,8 @@ const getJobStatus = async (req, res) => {
       
       if (isSingle && completedCount === 1) {
         const singleFile = job.files.find(f => f.status === 'completed');
-        await fs.rename(singleFile.processedPath, zipPath).catch(() => {});
+        // Use copyFile instead of rename so the file stays in /processed/ for live preview URLs.
+        await fs.copyFile(singleFile.processedPath, zipPath).catch(() => {});
       } else if (!isSingle && completedCount > 0) {
         const output = require('fs').createWriteStream(zipPath);
         const archive = archiver('zip', { zlib: { level: 6 } });

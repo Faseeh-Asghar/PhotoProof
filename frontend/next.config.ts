@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    const backendUrl = 'http://168.144.38.111';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://168.144.38.111';
     return [
       {
         source: '/api/:path*',
