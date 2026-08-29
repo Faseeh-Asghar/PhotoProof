@@ -1,40 +1,26 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { ImageIcon, Mail, Lock, User, CreditCard, Eye, EyeOff, CheckCircle2, Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle2, Eye, EyeOff, ImageIcon } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
-const Field = ({ label, id, children, error }: any) => (
-  <div style={{ marginBottom: 20 }}>
-    <label htmlFor={id} style={{ display: 'block', marginBottom: 8, fontSize: '0.875rem', fontWeight: 500, color: '#94A3B8' }}>
-      {label}
-    </label>
-    {children}
-    {error && <p style={{ color: '#FCA5A5', fontSize: '0.8rem', marginTop: 6 }}>{error}</p>}
-  </div>
-);
-
 export default function RegisterPage() {
-  const [step, setStep] = useState<'form' | 'success'>('form');
+  const [step, setStep]     = useState<'form' | 'success'>('form');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<any>({});
 
   const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    paymentMethod: 'jazzcash',
-    paymentNote: '',
+    name: '', email: '', password: '',
+    paymentMethod: 'jazzcash', paymentNote: '',
   });
 
   const validate = () => {
     const e: any = {};
-    if (!form.name.trim()) e.name = 'Full name is required';
-    if (!form.email) e.email = 'Email is required';
-    if (!form.password || form.password.length < 8) e.password = 'Password must be at least 8 characters';
+    if (!form.name.trim()) e.name = 'Required';
+    if (!form.email)       e.email = 'Required';
+    if (!form.password || form.password.length < 8) e.password = 'Min 8 characters';
     return e;
   };
 
@@ -42,191 +28,108 @@ export default function RegisterPage() {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    setErrors({});
-    setLoading(true);
-
+    setErrors({}); setLoading(true);
     try {
       await authApi.register(form);
       setStep('success');
     } catch (err: any) {
-      const msg = err.response?.data?.error || err.response?.data?.errors?.[0]?.msg || 'Registration failed';
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
+      toast.error(err.response?.data?.error || err.response?.data?.errors?.[0]?.msg || 'Registration failed');
+    } finally { setLoading(false); }
   };
-
-
 
   if (step === 'success') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          style={{ maxWidth: 480, width: '100%', textAlign: 'center' }}
-        >
-          <div className="card" style={{ padding: 48 }}>
-            <div style={{
-              width: 80, height: 80, borderRadius: '50%',
-              background: 'rgba(16,185,129,0.1)', border: '2px solid rgba(16,185,129,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 24px',
-            }}>
-              <CheckCircle2 size={40} color="#10B981" />
-            </div>
-            <h2 style={{ marginBottom: 16 }}>Registration Submitted!</h2>
-            <p style={{ marginBottom: 32, lineHeight: 1.7, color: '#94A3B8' }}>
-              Your account is pending payment verification. Here's what happens next:
-            </p>
-
-            <div style={{ textAlign: 'left', background: '#0D1322', borderRadius: 12, padding: 24, marginBottom: 32 }}>
-              {[
-                ['📱', 'Send the required amount via JazzCash or EasyPaisa to admin'],
-                ['✉️', 'Include your email in the payment description'],
-                ['⏳', 'Admin verifies and activates your account (< 24 hours)'],
-                ['🎉', 'You receive a confirmation email and can login'],
-              ].map(([icon, text], i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: i < 3 ? 16 : 0 }}>
-                  <span style={{ fontSize: '1.1rem' }}>{icon}</span>
-                  <span style={{ color: '#94A3B8', fontSize: '0.9rem', lineHeight: 1.6 }}>{text}</span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{
-              background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.25)',
-              borderRadius: 12, padding: 20, marginBottom: 32, textAlign: 'center',
-            }}>
-              <p style={{ color: '#818CF8', fontSize: '0.85rem', fontWeight: 700, marginBottom: 4 }}>Payment Contact Info</p>
-              <p style={{ color: '#F1F5F9', fontWeight: 600, marginTop: 8 }}>Phone Number: 0306 9136380</p>
-              <p style={{ color: '#F1F5F9', fontWeight: 600, marginTop: 4 }}>JazzCash Account: 0303 0934664</p>
-              <p style={{ color: '#64748B', fontSize: '0.8rem', marginTop: 12 }}>Up to 50 photos: 100 Rs | Up to 100 photos: 200 Rs</p>
-            </div>
-
-            <Link href="/login">
-              <button className="btn btn-primary btn-full">Go to Login →</button>
-            </Link>
-          </div>
-        </motion.div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'var(--bg-base)' }}>
+        <div className="card" style={{ padding: 32, maxWidth: 400, width: '100%', textAlign: 'center' }}>
+          <CheckCircle2 size={48} color="var(--brand-success)" style={{ margin: '0 auto 16px' }} />
+          <h2 style={{ marginBottom: 10, fontSize: '1.2rem' }}>Registration Sent!</h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.7 }}>
+            Pay via JazzCash <strong>0303 0934664</strong> and your account will be activated within 24 hours.
+          </p>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 20 }}>
+            WhatsApp: <strong>0306 9136380</strong>
+          </p>
+          <Link href="/login">
+            <button className="btn btn-primary btn-full">Go to Login</button>
+          </Link>
+        </div>
       </div>
     );
   }
 
+  const field = (key: keyof typeof form, label: string, type = 'text', placeholder = '') => (
+    <div style={{ marginBottom: 16 }}>
+      <label style={{ display: 'block', marginBottom: 6, fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
+      <input
+        className="input"
+        type={type}
+        placeholder={placeholder}
+        value={form[key]}
+        onChange={e => setForm({ ...form, [key]: e.target.value })}
+      />
+      {errors[key] && <p style={{ color: 'var(--brand-danger)', fontSize: '0.75rem', marginTop: 4 }}>{errors[key]}</p>}
+    </div>
+  );
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '40px 24px',
-      background: 'radial-gradient(ellipse at 50% 20%, rgba(79,70,229,0.08) 0%, transparent 60%)',
-    }}>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        style={{ width: '100%', maxWidth: 480 }}
-      >
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'var(--bg-base)' }}>
+      <div style={{ width: '100%', maxWidth: 420 }}>
+
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <Link href="/">
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12,
-                background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <ImageIcon size={22} color="white" />
-              </div>
-              <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '1.4rem', color: '#F1F5F9' }}>PhotoProof</span>
-            </div>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+            <ImageIcon size={20} color="var(--brand-primary)" />
+            <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>PhotoProof</span>
           </Link>
-          <h1 style={{ fontSize: '1.5rem', marginTop: 24, marginBottom: 8 }}>Create Account</h1>
-          <p style={{ color: '#64748B', fontSize: '0.9rem' }}>Flexible pricing — pay only for what you need</p>
+          <h1 style={{ marginTop: 16, marginBottom: 4, fontSize: '1.3rem' }}>Create Account</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Register and pay to get started</p>
         </div>
 
-        <div className="card" style={{ padding: 32 }}>
+        <div className="card" style={{ padding: 24 }}>
           <form onSubmit={handleSubmit}>
-            <Field label="Full Name" id="reg-name" error={errors.name}>
-              <div style={{ position: 'relative' }}>
-                <User size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                <input id="reg-name" className="input" type="text" placeholder="Muhammad Salman"
-                  value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  style={{ paddingLeft: 42 }} />
-              </div>
-            </Field>
+            {field('name', 'Full Name', 'text', 'Your name')}
+            {field('email', 'Email', 'email', 'you@example.com')}
 
-            <Field label="Email Address" id="reg-email" error={errors.email}>
+            {/* Password with toggle */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Password</label>
               <div style={{ position: 'relative' }}>
-                <Mail size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                <input id="reg-email" className="input" type="email" placeholder="you@gmail.com"
-                  value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  style={{ paddingLeft: 42 }} />
-              </div>
-            </Field>
-
-            <Field label="Password" id="reg-password" error={errors.password}>
-              <div style={{ position: 'relative' }}>
-                <Lock size={15} color="#475569" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                <input id="reg-password" className="input" type={showPw ? 'text' : 'password'} placeholder="At least 8 characters"
-                  value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  style={{ paddingLeft: 42, paddingRight: 42 }} />
-                <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
+                <input className="input" type={showPw ? 'text' : 'password'} placeholder="Min 8 characters"
+                  value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                  style={{ paddingRight: 42 }} />
+                <button type="button" onClick={() => setShowPw(!showPw)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}>
                   {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-            </Field>
-
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20, marginBottom: 20 }}>
-              <div style={{
-                background: 'rgba(79,70,229,0.05)', border: '1px solid rgba(79,70,229,0.15)',
-                borderRadius: 12, padding: 16, marginBottom: 20, textAlign: 'center',
-              }}>
-                <p style={{ color: '#F1F5F9', fontWeight: 600, fontSize: '0.9rem', marginBottom: 8 }}>Send Payment to Admin</p>
-                <p style={{ color: '#10B981', fontSize: '0.85rem', marginBottom: 4 }}>💳 JazzCash: <strong>0303 0934664</strong></p>
-                <p style={{ color: '#64748B', fontSize: '0.8rem', marginBottom: 12 }}>💬 WhatsApp for queries: <strong>0306 9136380</strong></p>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <span className="badge badge-primary">Up to 50 photos: 100 Rs</span>
-                  <span className="badge badge-primary">Up to 100 photos: 200 Rs</span>
-                </div>
-              </div>
-
-              <p style={{ color: '#64748B', fontSize: '0.82rem', marginBottom: 20, lineHeight: 1.6 }}>
-                <strong style={{ color: '#94A3B8' }}>Payment Info</strong> — Send a screenshot of your payment to WhatsApp (<strong>0306 9136380</strong>). 
-                Admin will verify and activate your account within a few minutes.
-              </p>
-
-              <Field label="Payment Method Used" id="reg-payment-method">
-                <select id="reg-payment-method" className="input"
-                  value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
-                  <option value="jazzcash">JazzCash</option>
-                  <option value="easypaisa">EasyPaisa</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="other">Other</option>
-                </select>
-              </Field>
+              {errors.password && <p style={{ color: 'var(--brand-danger)', fontSize: '0.75rem', marginTop: 4 }}>{errors.password}</p>}
             </div>
 
-            <motion.button
-              id="reg-submit"
-              type="submit"
-              className="btn btn-primary btn-full"
-              disabled={loading}
-              whileHover={{ scale: loading ? 1 : 1.01 }}
-            >
-              {loading ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : 'Create Account →'}
-            </motion.button>
+            {/* Payment note */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Payment Note <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+              <input className="input" type="text" placeholder="JazzCash transaction ID or note"
+                value={form.paymentNote} onChange={e => setForm({ ...form, paymentNote: e.target.value })} />
+            </div>
+
+            {/* Payment info */}
+            <div style={{ padding: '12px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, marginBottom: 20, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              💳 Pay via JazzCash: <strong style={{ color: 'var(--text-primary)' }}>0303 0934664</strong><br />
+              50 photos = 100 Rs &nbsp;|&nbsp; 100 photos = 200 Rs
+            </div>
+
+            <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+              {loading ? <><Loader2 size={15} className="animate-spin" /> Registering…</> : 'Register'}
+            </button>
           </form>
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: 20, color: '#64748B', fontSize: '0.875rem' }}>
-          Already have an account?{' '}
-          <Link href="/login" style={{ color: '#818CF8', fontWeight: 600 }}>Sign in</Link>
+        <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          Already have an account? <Link href="/login" style={{ color: 'var(--brand-primary)', fontWeight: 600 }}>Login</Link>
+          &nbsp;·&nbsp;
+          <Link href="/" style={{ color: 'var(--text-muted)' }}>Home</Link>
         </p>
-        <p style={{ textAlign: 'center', marginTop: 8 }}>
-          <Link href="/" style={{ color: '#475569', fontSize: '0.8rem' }}>← Back to home</Link>
-        </p>
-      </motion.div>
+      </div>
     </div>
   );
 }

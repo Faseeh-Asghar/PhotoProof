@@ -1,300 +1,172 @@
 'use client';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Upload, Zap, Shield, ChevronRight, Check,
-  ImageIcon, Download, ArrowRight, Layers, X,
-  Loader2, FileImage, Users
-} from 'lucide-react';
+import { Upload, Loader2, X, Download, ArrowRight, Check, ImageIcon } from 'lucide-react';
 import { uploadApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
-// ─── Data ──────────────────────────────────────────────────────────────────────
-const features = [
-  { icon: Upload, title: 'Bulk Upload', desc: 'Drop hundreds of photos at once. Process an entire class in seconds.' },
-  { icon: Zap, title: 'Instant Processing', desc: 'Sharp-powered resize + white background. No AI delays — pure speed.' },
-  { icon: ImageIcon, title: 'Perfect Specs', desc: 'Auto white background, exact 600×800 px, 10–20 KB. Every single time.' },
-  { icon: Download, title: 'ZIP Download', desc: 'All processed photos in one ZIP. Ready to submit anywhere.' },
-  { icon: Shield, title: 'Secure & Private', desc: 'Manual approval system. Your students\' photos never leave the server.' },
-  { icon: Layers, title: 'Built to Scale', desc: 'Built for 1 school or 1,000. The architecture grows with you.' },
-];
-
-const steps = [
-  { num: '01', title: 'Try Free', desc: 'Upload one photo instantly — no signup. See the result before paying.' },
-  { num: '02', title: 'Register & Pay', desc: 'Select your package and pay via JazzCash. Admin activates within 24h.' },
-  { num: '03', title: 'Bulk Upload', desc: 'Drag & drop up to 100 student photos at once.' },
-  { num: '04', title: 'Download ZIP', desc: 'All processed photos in one ZIP — perfectly formatted.' },
-];
-
-// ─── Navbar ────────────────────────────────────────────────────────────────────
-function Navbar() {
-  return (
-    <nav style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-      padding: '0 24px',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
-      background: 'rgba(7,11,20,0.88)',
-      backdropFilter: 'blur(20px)',
-    }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <ImageIcon size={18} color="white" />
-          </div>
-          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#F1F5F9' }}>
-            PhotoProof
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <Link href="/login"><button className="btn btn-ghost btn-sm">Login</button></Link>
-          <Link href="/register"><button className="btn btn-primary btn-sm">Get Started →</button></Link>
-        </div>
-      </div>
-    </nav>
-  );
-}
-
-// ─── Guest Upload Widget ───────────────────────────────────────────────────────
+// ─── Guest Upload ──────────────────────────────────────────────────────────────
 function GuestUploadWidget() {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [progressMsg, setProgressMsg] = useState<string | null>(null);
+  const [file, setFile]           = useState<File | null>(null);
+  const [preview, setPreview]     = useState<string | null>(null);
+  const [loading, setLoading]     = useState(false);
+  const [progressMsg, setProgressMsg] = useState('');
   const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [downloadName, setDownloadName] = useState('photoproof_result.jpg');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [downloadName, setDownloadName] = useState('result.jpg');
   const [isDragging, setIsDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (f: File) => {
-    if (!f.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
-    if (f.size > 20 * 1024 * 1024) { toast.error('Image must be under 20 MB'); return; }
+    if (!f.type.startsWith('image/')) { toast.error('Select an image file'); return; }
+    if (f.size > 20 * 1024 * 1024)   { toast.error('Max 20 MB');             return; }
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setResultUrl(null);
-    setDownloadName(f.name.replace(/\.[^/.]+$/, "") + "_processed.jpg");
-  };
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault(); setIsDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
+    setDownloadName(f.name.replace(/\.[^/.]+$/, '') + '_processed.jpg');
   };
 
   const handleProcess = async () => {
     if (!file) return;
-
-    // Check lifetime limit
     const uses = parseInt(localStorage.getItem('guest_uses') || '0', 10);
-    if (uses >= 3) {
-      toast.error('Free limit reached (3/3 lifetime). Please sign up for unlimited access!');
-      return;
-    }
+    if (uses >= 3) { toast.error('Free limit reached (3). Please sign up.'); return; }
 
     setLoading(true);
-    setLoading(true);
-    setProgressMsg('Uploading photo...');
+    setProgressMsg('Uploading…');
     try {
-      // 1. Fast scale down (1024px max) to save upload bandwidth
       const bmp = await createImageBitmap(file);
-      let w = bmp.width; let h = bmp.height;
-      if (Math.max(w, h) > 1024) {
-        const ratio = 1024 / Math.max(w, h);
-        w = Math.round(w * ratio); h = Math.round(h * ratio);
-      }
+      let w = bmp.width, h = bmp.height;
+      if (Math.max(w, h) > 1024) { const r = 1024 / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d')?.drawImage(bmp, 0, 0, w, h);
       const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.9));
-      
-      const rawFile = blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file;
+      const raw  = blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file;
 
-      // 2. Upload to server (sync processing for guest)
-      setProgressMsg('AI Processing on server...');
-      const res = await uploadApi.guestUpload(rawFile);
-      
-      const url = URL.createObjectURL(res.data);
-      setResultUrl(url);
-      
+      setProgressMsg('AI Processing…');
+      const res = await uploadApi.guestUpload(raw);
+      setResultUrl(URL.createObjectURL(res.data));
       localStorage.setItem('guest_uses', (uses + 1).toString());
-      toast.success('✅ Photo processed flawlessly!');
+      toast.success('Done!');
     } catch (err: any) {
-      console.error(err);
-      let errMsg = 'Processing failed — please try a different image.';
+      let msg = 'Processing failed.';
       if (err.response?.data instanceof Blob) {
-        try {
-          const text = await err.response.data.text();
-          const json = JSON.parse(text);
-          if (json.error) errMsg = json.error;
-        } catch (e) {}
-      } else if (err.response?.data?.error) {
-        errMsg = err.response.data.error;
-      }
-      toast.error(errMsg);
+        try { const j = JSON.parse(await err.response.data.text()); if (j.error) msg = j.error; } catch {}
+      } else if (err.response?.data?.error) msg = err.response.data.error;
+      toast.error(msg);
     } finally {
       setLoading(false);
-      setProgressMsg(null);
+      setProgressMsg('');
     }
   };
 
   const reset = () => {
-    setFile(null); setPreview(null); setResultUrl(null); setProgressMsg(null);
+    setFile(null); setPreview(null); setResultUrl(null);
     if (inputRef.current) inputRef.current.value = '';
   };
 
   return (
     <div style={{
-      background: 'rgba(13,19,34,0.9)',
-      border: '1px solid rgba(79,70,229,0.25)',
-      borderRadius: 20,
-      padding: 32,
-      maxWidth: 720,
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-default)',
+      borderRadius: 'var(--radius-lg)',
+      padding: 24,
+      maxWidth: 560,
       margin: '0 auto',
     }}>
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
-          borderRadius: 20, padding: '4px 14px', marginBottom: 12,
-        }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
-          <span style={{ color: '#10B981', fontSize: '0.78rem', fontWeight: 600 }}>FREE TRIAL</span>
-        </div>
-        <h3 style={{ fontSize: '1.15rem', marginBottom: 6 }}>Try PhotoProof Instantly</h3>
-        <p style={{ color: '#64748B', fontSize: '0.875rem' }}>See the exact results before upgrading your school.</p>
-      </div>
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+        onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
 
-      {!resultUrl && (
+      {!resultUrl ? (
         <>
+          {/* Drop zone */}
           <div
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
-            onDrop={onDrop}
+            onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
             onClick={() => !file && inputRef.current?.click()}
             style={{
-              border: `2px dashed ${isDragging ? 'rgba(79,70,229,0.8)' : file ? 'rgba(16,185,129,0.4)' : 'rgba(79,70,229,0.3)'}`,
-              borderRadius: 14,
-              padding: file ? '16px' : '36px 24px',
+              border: `2px dashed ${isDragging ? 'var(--brand-primary)' : file ? 'var(--brand-success)' : 'var(--border-default)'}`,
+              borderRadius: 'var(--radius-md)',
+              padding: file ? 16 : '32px 20px',
               textAlign: 'center',
               cursor: file ? 'default' : 'pointer',
-              background: isDragging ? 'rgba(79,70,229,0.06)' : 'transparent',
-              transition: 'all 250ms',
-              marginBottom: 20,
-              position: 'relative',
+              background: isDragging ? 'rgba(37,99,235,0.04)' : 'var(--bg-elevated)',
+              marginBottom: 16,
+              transition: 'all var(--transition-fast)',
             }}
           >
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-              id="guest-file-input"
-            />
-
             {file && preview ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center' }}>
-                <img src={preview} alt="Preview" style={{ width: 80, height: 107, objectFit: 'cover', borderRadius: 8, border: '2px solid rgba(255,255,255,0.1)' }} />
-                <div style={{ textAlign: 'left' }}>
-                  <p style={{ fontWeight: 600, color: '#F1F5F9', marginBottom: 4, fontSize: '0.9rem' }}>{file.name}</p>
-                  <p style={{ color: '#64748B', fontSize: '0.8rem' }}>{(file.size / 1024).toFixed(0)} KB · Ready to process</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <img src={preview} alt="" style={{ width: 56, height: 75, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border-subtle)' }} />
+                <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
+                  <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2 }}>{(file.size / 1024).toFixed(0)} KB</p>
                 </div>
-                <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', marginLeft: 'auto' }}>
-                  <X size={18} />
+                <button onClick={e => { e.stopPropagation(); reset(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
+                  <X size={16} />
                 </button>
               </div>
             ) : (
               <>
-                <div style={{
-                  width: 56, height: 56, borderRadius: 14,
-                  background: 'rgba(79,70,229,0.12)', border: '1px solid rgba(79,70,229,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 14px',
-                }}>
-                  <FileImage size={26} color="#818CF8" />
-                </div>
-                <p style={{ color: '#94A3B8', fontSize: '0.9rem', marginBottom: 6 }}>Drop your photo here or click to browse</p>
-                <p style={{ color: '#475569', fontSize: '0.78rem' }}>JPG, PNG, WEBP · Max 20MB</p>
+                <Upload size={28} color="var(--text-muted)" style={{ margin: '0 auto 10px' }} />
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: 4 }}>Drop photo here or click to browse</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>JPG, PNG, WEBP · Max 20 MB</p>
               </>
             )}
           </div>
 
-          <motion.button
+          <button
             className="btn btn-primary btn-full"
             onClick={handleProcess}
             disabled={!file || loading}
-            whileHover={{ scale: (!file || loading) ? 1 : 1.01 }}
-            style={{ gap: 8, fontSize: '0.95rem' }}
           >
             {loading
-              ? <><Loader2 size={16} className="animate-spin" /> {progressMsg || 'Processing photo...'}</>
-              : <><Zap size={16} /> Process Photo with AI (Free)</>
+              ? <><Loader2 size={15} className="animate-spin" /> {progressMsg}</>
+              : 'Process Photo (Free)'
             }
-          </motion.button>
-          
-          <p style={{ textAlign: 'center', color: '#334155', fontSize: '0.76rem', marginTop: 12 }}>
-            3 free lifetime images remaining
+          </button>
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 10 }}>
+            3 free tries · No signup required
           </p>
         </>
-      )}
-
-      {resultUrl && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <div style={{ display: 'flex', gap: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
+      ) : (
+        <>
+          {/* Result */}
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: '#475569', fontSize: '0.75rem', marginBottom: 8 }}>Original</p>
-              <img src={preview!} alt="Original" style={{ width: 120, height: 160, objectFit: 'cover', borderRadius: 10, border: '2px solid rgba(255,255,255,0.08)' }} />
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: 6 }}>Original</p>
+              <img src={preview!} alt="Original" style={{ width: 100, height: 133, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-subtle)' }} />
             </div>
-            <ArrowRight size={24} color="#4F46E5" />
+            <ArrowRight size={20} color="var(--text-muted)" style={{ alignSelf: 'center' }} />
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: '#10B981', fontSize: '0.75rem', marginBottom: 8, fontWeight: 600 }}>✅ Processed</p>
-              <img src={resultUrl} alt="Processed" style={{ width: 120, height: 160, objectFit: 'contain', borderRadius: 10, border: '2px solid rgba(16,185,129,0.3)', background: 'white' }} />
+              <p style={{ color: 'var(--brand-success)', fontSize: '0.72rem', marginBottom: 6 }}>✓ Processed</p>
+              <img src={resultUrl} alt="Processed" style={{ width: 100, height: 133, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border-subtle)', background: '#fff' }} />
             </div>
           </div>
 
-          <div style={{ marginBottom: 16, textAlign: 'left' }}>
-            <div style={{ color: '#64748B', fontSize: '0.75rem', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Original: {file?.name || 'Unknown'}
-            </div>
-            <input 
-              type="text" 
-              value={downloadName} 
-              onChange={(e) => setDownloadName(e.target.value)} 
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#F1F5F9', fontSize: '0.9rem', outline: 'none' }} 
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10 }}>
             <a href={resultUrl} download={downloadName} style={{ flex: 1 }}>
-              <button className="btn btn-success btn-full" style={{ gap: 8 }}>
-                <Download size={16} /> Download Result
-              </button>
+              <button className="btn btn-success btn-full"><Download size={14} /> Download</button>
             </a>
-            <button onClick={reset} className="btn btn-ghost" style={{ flex: 1 }}>
-              Try Another
-            </button>
+            <button className="btn btn-ghost" onClick={reset} style={{ flex: 1 }}>Try Another</button>
           </div>
 
           <div style={{
-            marginTop: 20, padding: '16px 20px',
-            background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.2)',
-            borderRadius: 12, textAlign: 'center',
+            marginTop: 16, padding: '14px 16px',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
+            textAlign: 'center',
           }}>
-            <p style={{ color: '#818CF8', fontSize: '0.875rem', fontWeight: 600, marginBottom: 4 }}>
-              Need to process a whole class?
-            </p>
-            <p style={{ color: '#64748B', fontSize: '0.8rem', marginBottom: 12 }}>
-              Register and get up to 50 photos for 100 Rs, or 100 photos for 200 Rs!
+            <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem', marginBottom: 6 }}>Need bulk processing?</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: 12 }}>
+              50 photos — 100 Rs &nbsp;|&nbsp; 100 photos — 200 Rs
             </p>
             <Link href="/register">
-              <button className="btn btn-primary btn-sm">Register Now →</button>
+              <button className="btn btn-primary btn-sm">Register Now</button>
             </Link>
           </div>
-        </motion.div>
+        </>
       )}
     </div>
   );
@@ -302,378 +174,104 @@ function GuestUploadWidget() {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-
-  useEffect(() => {
-    // Listen for PWA install prompt
-    const handler = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstallClick = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
-    } else {
-      toast.error('App installation is not supported or already installed. Try from your browser menu.');
-    }
-  };
-
   return (
-    <div>
-      <Navbar />
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── Hero ── */}
-      <section style={{
-        minHeight: '100vh',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        textAlign: 'center',
-        padding: '120px 24px 80px',
-        position: 'relative', overflow: 'hidden',
+      {/* Navbar */}
+      <nav style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'var(--bg-surface)',
+        borderBottom: '1px solid var(--border-subtle)',
+        padding: '0 20px',
       }}>
-        {/* Background glow */}
-        <div style={{
-          position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)',
-          width: 600, height: 600, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ImageIcon size={20} color="var(--brand-primary)" />
+            <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>PhotoProof</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href="/login"><button className="btn btn-ghost btn-sm">Login</button></Link>
+            <Link href="/register"><button className="btn btn-primary btn-sm">Register</button></Link>
+          </div>
+        </div>
+      </nav>
 
-        <div style={{ maxWidth: 780, position: 'relative', zIndex: 1 }}>
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)',
-              borderRadius: 20, padding: '6px 16px', marginBottom: 32,
-            }}>
-              <Zap size={13} color="#818CF8" />
-              <span style={{ color: '#818CF8', fontSize: '0.82rem', fontWeight: 600 }}>School Photo Processing — Automated</span>
+      {/* Hero */}
+      <main style={{ flex: 1, padding: '48px 20px 64px', maxWidth: 900, margin: '0 auto', width: '100%' }}>
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <h1 style={{ marginBottom: 10 }}>Student Photo Processing</h1>
+          <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', maxWidth: 440, margin: '0 auto 8px' }}>
+            Upload student photos — get white background, 600×800 px, ready to submit.
+          </p>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            Try one photo free below, no account needed.
+          </p>
+        </div>
+
+        {/* Guest Upload */}
+        <GuestUploadWidget />
+
+        {/* How it works — minimal */}
+        <div style={{ marginTop: 56, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, textAlign: 'center' }}>
+          {[
+            { num: '1', text: 'Try one photo free' },
+            { num: '2', text: 'Register & pay via JazzCash' },
+            { num: '3', text: 'Upload up to 100 photos' },
+            { num: '4', text: 'Download ZIP' },
+          ].map(s => (
+            <div key={s.num} style={{ padding: '16px 12px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-primary)', color: '#fff', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>{s.num}</div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: 0 }}>{s.text}</p>
             </div>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.6 }}
-            style={{ fontSize: 'clamp(2.2rem, 6vw, 3.8rem)', lineHeight: 1.15, marginBottom: 24, fontFamily: 'Syne, sans-serif' }}
-          >
-            Student Photos,{' '}
-            <span style={{
-              background: 'linear-gradient(135deg, #818CF8, #A78BFA, #4F46E5)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>
-              Perfect Every Time
-            </span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            style={{ fontSize: '1.15rem', color: '#64748B', lineHeight: 1.75, marginBottom: 40, maxWidth: 580, margin: '0 auto 40px' }}
-          >
-            Upload 100 student photos at once. Automatically get white background,
-            600×800 px, 10–20 KB JPEG — ready for forms and admission portals.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-            style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}
-          >
-            <a href="#try-free">
-              <button className="btn btn-primary btn-lg">
-                Try It Free
-              </button>
-            </a>
-            <Link href="/register">
-              <button className="btn btn-ghost btn-lg" style={{ gap: 8 }}>
-                Get Started <ArrowRight size={18} />
-              </button>
-            </Link>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-            style={{ marginBottom: 64, textAlign: 'center' }}
-          >
-            <div style={{
-              display: 'inline-block',
-              background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
-              borderRadius: 12, padding: '12px 24px',
-            }}>
-              <p style={{ color: '#10B981', fontSize: '0.9rem', fontWeight: 500, marginBottom: 8 }}>
-                📱 For blazing fast uploads & offline working:
-              </p>
-              <button className="btn btn-success btn-sm" style={{ gap: 6 }} onClick={handleInstallClick}>
-                <Download size={14} /> Install Offline App
-              </button>
-            </div>
-          </motion.div>
-
-          {/* Stats */}
-          <div style={{ display: 'flex', gap: 40, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {[
-              { value: '600×800', label: 'Output resolution' },
-              { value: '10–20 KB', label: 'File size target' },
-              { value: '100 photos', label: 'Per batch upload' },
-              { value: '<10 sec', label: 'Per photo' },
-            ].map((s) => (
-              <div key={s.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '1.4rem', color: '#F1F5F9' }}>{s.value}</div>
-                <div style={{ color: '#475569', fontSize: '0.78rem', marginTop: 4 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
-      </section>
 
-      {/* ── Try Free Section ── */}
-      <section id="try-free" style={{ padding: '80px 24px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 48 }}>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', marginBottom: 16 }}>
-              Try Before You Pay
-            </h2>
-            <p style={{ color: '#64748B', maxWidth: 480, margin: '0 auto', lineHeight: 1.75 }}>
-              No account. No payment. Upload one photo and see the exact result you'll get.
-            </p>
-          </motion.div>
-        </div>
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.1 }}
-        >
-          <GuestUploadWidget />
-        </motion.div>
-      </section>
-
-      {/* ── Features ── */}
-      <section style={{ padding: '80px 24px', background: 'rgba(13,19,34,0.4)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', marginBottom: 16 }}
-            >
-              Everything You Need
-            </motion.h2>
-            <p style={{ color: '#64748B' }}>Built specifically for Pakistani schools</p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
-            {features.map((f, i) => (
-              <motion.div
-                key={f.title}
-                className="card"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.07 }}
-                style={{ padding: '28px 24px' }}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12,
-                  background: 'rgba(79,70,229,0.12)', border: '1px solid rgba(79,70,229,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  marginBottom: 16,
-                }}>
-                  <f.icon size={20} color="#818CF8" />
+        {/* Pricing */}
+        <div style={{ marginTop: 48, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+          {[
+            { price: '100 Rs', photos: '50 photos' },
+            { price: '200 Rs', photos: '100 photos' },
+          ].map(p => (
+            <div key={p.price} style={{ padding: 20, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+              <p style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px' }}>{p.price}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: 14 }}>{p.photos}</p>
+              {[
+                'White background, 600×800 px',
+                'Bulk upload',
+                'ZIP download',
+              ].map(f => (
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, justifyContent: 'center' }}>
+                  <Check size={13} color="var(--brand-success)" />
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{f}</span>
                 </div>
-                <h3 style={{ fontSize: '1rem', marginBottom: 8 }}>{f.title}</h3>
-                <p style={{ color: '#64748B', fontSize: '0.875rem', lineHeight: 1.7 }}>{f.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── How It Works ── */}
-      <section style={{ padding: '80px 24px' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', marginBottom: 12 }}
-            >
-              How It Works
-            </motion.h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 32 }}>
-            {steps.map((step, i) => (
-              <motion.div
-                key={step.num}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                style={{ textAlign: 'center', position: 'relative' }}
-              >
-                <div style={{
-                  width: 56, height: 56, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 16px',
-                  fontFamily: 'Syne, sans-serif', fontWeight: 800, color: 'white', fontSize: '1rem',
-                }}>
-                  {step.num}
-                </div>
-                <h3 style={{ fontSize: '1rem', marginBottom: 8 }}>{step.title}</h3>
-                <p style={{ color: '#64748B', fontSize: '0.875rem', lineHeight: 1.7 }}>{step.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Pricing ── */}
-      <section id="pricing" style={{ padding: '80px 24px', background: 'rgba(13,19,34,0.4)' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', textAlign: 'center' }}>
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-            <h2 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', marginBottom: 12 }}>Simple Pricing</h2>
-            <p style={{ color: '#64748B', marginBottom: 48 }}>Pay for what you need. No hidden fees.</p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginBottom: 24 }}>
-              {/* Plan 1 */}
-              <div style={{
-                background: 'rgba(26,35,56,0.8)',
-                border: '2px solid rgba(79,70,229,0.3)',
-                borderRadius: 20,
-                padding: '40px 32px',
-                position: 'relative',
-              }}>
-                <div style={{ marginBottom: 8 }}>
-                  <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '3.5rem', color: '#F1F5F9', lineHeight: 1 }}>
-                    100
-                  </span>
-                  <span style={{ color: '#64748B', fontSize: '1rem', marginLeft: 6 }}>PKR</span>
-                </div>
-                <p style={{ color: '#818CF8', fontSize: '1.1rem', fontWeight: 600, marginBottom: 24 }}>Up to 50 Photos</p>
-                <div style={{ textAlign: 'left', marginBottom: 32 }}>
-                  {[
-                    '50 student photos',
-                    'Bulk upload processing',
-                    'White background, 600×800 px',
-                    'ZIP or individual JPEGs download',
-                  ].map((item) => (
-                    <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                      <Check size={16} color="#10B981" />
-                      <span style={{ color: '#94A3B8', fontSize: '0.875rem' }}>{item}</span>
-                    </div>
-                  ))}
-                </div>
-                <Link href="/register">
-                  <button className="btn btn-primary btn-full">Register & Pay 100 Rs</button>
-                </Link>
-              </div>
-
-              {/* Plan 2 */}
-              <div style={{
-                background: 'rgba(26,35,56,0.8)',
-                border: '2px solid rgba(79,70,229,0.5)',
-                borderRadius: 20,
-                padding: '40px 32px',
-                position: 'relative',
-              }}>
-                <div style={{
-                  position: 'absolute', top: 0, left: '50%', transform: 'translate(-50%, -50%)',
-                  background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                  borderRadius: 20, padding: '4px 16px',
-                }}>
-                  <span style={{ color: 'white', fontSize: '0.8rem', fontWeight: 700 }}>Best Value</span>
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '3.5rem', color: '#F1F5F9', lineHeight: 1 }}>
-                    200
-                  </span>
-                  <span style={{ color: '#64748B', fontSize: '1rem', marginLeft: 6 }}>PKR</span>
-                </div>
-                <p style={{ color: '#818CF8', fontSize: '1.1rem', fontWeight: 600, marginBottom: 24 }}>Up to 100 Photos</p>
-                <div style={{ textAlign: 'left', marginBottom: 32 }}>
-                  {[
-                    '100 student photos',
-                    'Bulk upload processing',
-                    'White background, 600×800 px',
-                    'ZIP or individual JPEGs download',
-                  ].map((item) => (
-                    <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                      <Check size={16} color="#10B981" />
-                      <span style={{ color: '#94A3B8', fontSize: '0.875rem' }}>{item}</span>
-                    </div>
-                  ))}
-                </div>
-                <Link href="/register">
-                  <button className="btn btn-primary btn-full">Register & Pay 200 Rs</button>
-                </Link>
-              </div>
-            </div>
-
-            <div style={{
-              marginTop: 24, padding: '24px 20px',
-              background: 'rgba(79,70,229,0.06)', border: '1px solid rgba(79,70,229,0.15)',
-              borderRadius: 12,
-            }}>
-              <p style={{ color: '#F1F5F9', fontWeight: 600, marginBottom: 8 }}>Payment Info</p>
-              <p style={{ color: '#10B981', fontSize: '0.9rem', marginBottom: 4 }}>💳 JazzCash: <strong>0303 0934664</strong></p>
-              <p style={{ color: '#64748B', fontSize: '0.9rem' }}>💬 WhatsApp for queries: <strong>0306 9136380</strong></p>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section style={{ padding: '80px 24px', textAlign: 'center' }}>
-        <div style={{ maxWidth: 640, margin: '0 auto' }}>
-          <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-            <h2 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', marginBottom: 16 }}>
-              Ready to Save Hours Every Term?
-            </h2>
-            <p style={{ color: '#64748B', marginBottom: 32, lineHeight: 1.75 }}>
-              PhotoProof processes a full class of 40 students in under a minute.
-              Try one photo free — no card, no signup.
-            </p>
-            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="#try-free">
-                <button className="btn btn-ghost btn-lg">Try Free First</button>
-              </a>
+              ))}
               <Link href="/register">
-                <button className="btn btn-primary btn-lg" style={{ gap: 8 }}>
-                  Register Now <ArrowRight size={18} />
-                </button>
+                <button className="btn btn-primary btn-sm" style={{ marginTop: 12, width: '100%' }}>Get Started</button>
               </Link>
             </div>
-          </motion.div>
+          ))}
         </div>
-      </section>
 
-      {/* ── Footer ── */}
-      <footer style={{
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        padding: '32px 24px',
-        textAlign: 'center',
-        color: '#334155',
-        fontSize: '0.82rem',
-      }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 7, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ImageIcon size={14} color="white" />
-            </div>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: '#475569' }}>PhotoProof</span>
-          </div>
-          <p>© {new Date().getFullYear()} PhotoProof. Built for Pakistani schools.</p>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <Link href="/login" style={{ color: '#334155' }}>Login</Link>
-            <Link href="/register" style={{ color: '#334155' }}>Register</Link>
-            <a href="mailto:faseehasghar167@gmail.com" style={{ color: '#334155' }}>Contact</a>
-          </div>
+        {/* Contact */}
+        <div style={{ marginTop: 32, padding: '16px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>
+            💳 JazzCash: <strong style={{ color: 'var(--text-primary)' }}>0303 0934664</strong>
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            💬 WhatsApp: <strong style={{ color: 'var(--text-primary)' }}>0306 9136380</strong>
+          </p>
         </div>
+      </main>
+
+      {/* Footer */}
+      <footer style={{ borderTop: '1px solid var(--border-subtle)', padding: '16px 20px', textAlign: 'center' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: 0 }}>
+          © {new Date().getFullYear()} PhotoProof &nbsp;·&nbsp;
+          <Link href="/login" style={{ color: 'var(--text-muted)' }}>Login</Link>
+          &nbsp;·&nbsp;
+          <Link href="/register" style={{ color: 'var(--text-muted)' }}>Register</Link>
+          &nbsp;·&nbsp;
+          <a href="mailto:faseehasghar167@gmail.com" style={{ color: 'var(--text-muted)' }}>Contact</a>
+        </p>
       </footer>
     </div>
   );
