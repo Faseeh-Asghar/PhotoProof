@@ -147,7 +147,7 @@ export default function DashboardPage() {
     if (!user) return;
     
     // Quota check early
-    const remaining = user.quota_limit - user.images_processed;
+    const remaining = user.quotaLimit - user.imagesProcessed;
     if (remaining < files.length) {
       toast.error(`Quota exceeded! You can only process ${Math.max(0, remaining)} more images.`);
       return;
