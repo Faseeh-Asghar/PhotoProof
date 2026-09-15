@@ -13,7 +13,6 @@ export async function processImageLocally(
     // 1. Run AI background removal. In the browser, this automatically uses WASM.
     // It returns a Blob containing a transparent PNG.
     const bgRemovedBlob = await removeBackground(file, {
-      model: 'medium',
       progress: (key, current, total) => {
         // e.g., fetching model
         if (key.includes('fetch') && onProgress) {
