@@ -31,28 +31,18 @@ function GuestUploadWidget() {
     if (uses >= 3) { toast.error('Free limit reached (3). Please sign up.'); return; }
 
     setLoading(true);
-    setProgressMsg('Uploading…');
+    setProgressMsg('Starting AI...');
     try {
-      const bmp = await createImageBitmap(file);
-      let w = bmp.width, h = bmp.height;
-      if (Math.max(w, h) > 1024) { const r = 1024 / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d')?.drawImage(bmp, 0, 0, w, h);
-      const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.9));
-      const raw  = blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file;
+      const { processImageLocally } = await import('@/lib/processImage');
+      const finalBlob = await processImageLocally(file, 600, 800, 20, (msg) => {
+        setProgressMsg(msg);
+      });
 
-      setProgressMsg('AI Processing…');
-      const res = await uploadApi.guestUpload(raw);
-      setResultUrl(URL.createObjectURL(res.data));
+      setResultUrl(URL.createObjectURL(finalBlob));
       localStorage.setItem('guest_uses', (uses + 1).toString());
       toast.success('Done!');
     } catch (err: any) {
-      let msg = 'Processing failed.';
-      if (err.response?.data instanceof Blob) {
-        try { const j = JSON.parse(await err.response.data.text()); if (j.error) msg = j.error; } catch {}
-      } else if (err.response?.data?.error) msg = err.response.data.error;
-      toast.error(msg);
+      toast.error(err.message || 'Processing failed. Try a clearer photo.');
     } finally {
       setLoading(false);
       setProgressMsg('');

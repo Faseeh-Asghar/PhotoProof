@@ -4,16 +4,16 @@ const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../db');
 const archiver = require('archiver');
-const { imageQueue, PROCESSED_DIR } = require('../services/imageQueue');
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads');
 const ZIPS_DIR = path.join(__dirname, '../../zips');
+const PROCESSED_DIR = path.join(__dirname, '../../processed');
 
 // ─── Multer config ────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    require('fs').mkdirSync(UPLOAD_DIR, { recursive: true });
-    cb(null, UPLOAD_DIR);
+    require('fs').mkdirSync(PROCESSED_DIR, { recursive: true });
+    cb(null, PROCESSED_DIR);
   },
   filename: function (req, file, cb) {
     cb(null, uuidv4() + path.extname(file.originalname));
@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/tiff', 'image/bmp', 'image/heic', 'image/heif'];
+  const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -38,82 +38,81 @@ const upload = multer({
   },
 });
 
-const uploadBatch = async (req, res) => {
+const uploadBatchProcessed = async (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: 'No files uploaded' });
   }
-
-  // Parse processing settings from request body
-  const targetWidth = parseInt(req.body.targetWidth) || 600;
-  const targetHeight = parseInt(req.body.targetHeight) || 800;
-  const targetSizeKb = parseInt(req.body.targetSizeKb) || 20;
 
   const user = req.user;
 
   // Check quota
   const remaining = user.quota_limit - user.images_processed;
   if (remaining <= 0) {
-    return res.status(403).json({
-      error: 'Image quota exceeded',
-      quotaLimit: user.quota_limit,
-      imagesProcessed: user.images_processed,
-    });
+    for (const f of req.files) await fs.unlink(f.path).catch(() => {});
+    return res.status(403).json({ error: 'Image quota exceeded' });
   }
 
-  const filesToProcess = req.files.slice(0, Math.min(req.files.length, remaining));
-  // Clean up any files that exceed quota so they don't orphan on disk
+  const filesToKeep = req.files.slice(0, Math.min(req.files.length, remaining));
   const filesToDrop = req.files.slice(Math.min(req.files.length, remaining));
-  for (const f of filesToDrop) { await fs.unlink(f.path).catch(() => {}); }
+  for (const f of filesToDrop) await fs.unlink(f.path).catch(() => {});
+
   const jobId = uuidv4();
 
   try {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
+    const downloadUrl = `/api/upload/download/${jobId}`;
 
-    // Create pending job record
-    await query(
-      `INSERT INTO jobs (id, user_id, status, total_files, processed_files, failed_files, zip_url, zip_expires_at) 
-       VALUES ($1, $2, 'processing', $3, 0, 0, $4, $5)`,
-      [jobId, user.id, filesToProcess.length, `/api/upload/download/${jobId}`, expiresAt]
-    );
-
-    // Update user quota early
+    // Update user quota
     await query(
       `UPDATE users SET images_processed = images_processed + $1 WHERE id = $2`,
-      [filesToProcess.length, user.id]
+      [filesToKeep.length, user.id]
     );
 
-    // Queue files for processing
-    for (const file of filesToProcess) {
-      const fileId = uuidv4();
-      
-      // We rely on the body arrays if custom names were provided (this assumes frontend sends customNames[index] or similar, but for now we use originalname)
-      await query(
-        `INSERT INTO job_files (id, job_id, original_name, status, stored_name) 
-         VALUES ($1, $2, $3, 'queued', $4)`,
-        [fileId, jobId, file.originalname, file.path]
-      );
+    // Create job record (already completed since it's processed on client)
+    await query(
+      `INSERT INTO jobs (id, user_id, status, total_files, processed_files, failed_files, zip_url, zip_expires_at) 
+       VALUES ($1, $2, 'completed', $3, $4, 0, $5, $6)`,
+      [jobId, user.id, filesToKeep.length, filesToKeep.length, downloadUrl, expiresAt]
+    );
 
-      await imageQueue.add({
-        fileId,
-        jobId,
-        filePath: file.path,
-        originalName: file.originalname,
-        targetWidth,
-        targetHeight,
-        targetSizeKb
-      }, { removeOnComplete: true });
+    // Create job files
+    for (const file of filesToKeep) {
+      const fileId = uuidv4();
+      await query(
+        `INSERT INTO job_files (id, job_id, original_name, status, stored_name, processed_name, processed_size_bytes) 
+         VALUES ($1, $2, $3, 'completed', $4, $4, $5)`,
+        [fileId, jobId, file.originalname, file.path, file.size]
+      );
+    }
+
+    // Generate ZIP immediately
+    await fs.mkdir(ZIPS_DIR, { recursive: true });
+    const isSingle = filesToKeep.length === 1;
+    const zipPath = path.join(ZIPS_DIR, isSingle ? `${jobId}.jpeg` : `${jobId}.zip`);
+
+    if (isSingle) {
+      await fs.copyFile(filesToKeep[0].path, zipPath).catch(() => {});
+    } else {
+      const output = require('fs').createWriteStream(zipPath);
+      const archive = archiver('zip', { zlib: { level: 6 } });
+      archive.pipe(output);
+      
+      filesToKeep.forEach(f => {
+        archive.file(f.path, { name: f.originalname });
+      });
+      await archive.finalize();
     }
 
     return res.status(200).json({
       jobId,
-      status: 'processing',
-      totalFiles: filesToProcess.length,
-      message: `Started processing ${filesToProcess.length} images.`,
+      status: 'completed',
+      downloadUrl,
+      message: `Saved ${filesToKeep.length} images.`,
     });
   } catch (err) {
     console.error('Upload batch error:', err);
-    return res.status(500).json({ error: err.message || 'Upload failed. Please try again.' });
+    return res.status(500).json({ error: err.message || 'Upload failed.' });
   }
 };
 
@@ -330,28 +329,5 @@ const downloadZip = async (req, res) => {
 };
 
 
-const guestUpload = async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No image uploaded.' });
-  }
-
-  const { processImageBuffer } = require('../services/imageQueue');
-
-  try {
-    const finalBuffer = await processImageBuffer(req.file.path, 600, 800, 20);
-    
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Content-Disposition', `attachment; filename="photoproof_guest_${Date.now()}.jpg"`);
-    
-    res.send(finalBuffer);
-  } catch (err) {
-    console.error('Guest upload error:', err);
-    res.status(500).json({ error: err.message || 'Processing failed.' });
-  } finally {
-    const fs = require('fs').promises;
-    fs.unlink(req.file.path).catch(console.error);
-  }
-};
-
-module.exports = { upload, uploadBatch, getJobStatus, listJobs, downloadZip, guestUpload, deleteJob };
+module.exports = { upload, uploadBatchProcessed, getJobStatus, listJobs, downloadZip, deleteJob };
 

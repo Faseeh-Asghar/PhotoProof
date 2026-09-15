@@ -26,7 +26,8 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://168.144.38.111';
+    // Point this to your new Render backend URL once deployed
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://photoproof-backend.onrender.com';
     return [
       {
         source: '/api/:path*',

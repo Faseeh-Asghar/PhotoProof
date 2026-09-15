@@ -53,6 +53,38 @@ export default function DashboardPage() {
   const [targetWidth, setTargetWidth] = useState(600);
   const [targetHeight, setTargetHeight] = useState(800);
   const [targetSizeKb, setTargetSizeKb] = useState(20);
+  const [isMobile, setIsMobile] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768);
+  }, []);
+
+  // Mobile: download each processed photo individually (goes to Downloads/Gallery)
+  const downloadAllMobile = async () => {
+    const done = files.filter(f => f.status === 'done' && f.processedPreview);
+    if (!done.length) { toast.error('No processed photos to download'); return; }
+    setDownloadingAll(true);
+    toast.success(`Downloading ${done.length} photos…`);
+    for (let i = 0; i < done.length; i++) {
+      try {
+        const res  = await fetch(done[i].processedPreview!);
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = done[i].customName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        // Small delay so the browser doesn't block multiple downloads
+        await new Promise(r => setTimeout(r, 900));
+      } catch { /* skip failed */ }
+    }
+    setDownloadingAll(false);
+    toast.success('All photos downloaded!');
+  };
 
   const loadJobs = () => {
     setLoadingJobs(true);
@@ -112,95 +144,91 @@ export default function DashboardPage() {
 
   const handleUpload = async () => {
     if (files.length === 0) return;
+    if (!user) return;
+    
+    // Quota check early
+    const remaining = user.quota_limit - user.images_processed;
+    if (remaining < files.length) {
+      toast.error(`Quota exceeded! You can only process ${Math.max(0, remaining)} more images.`);
+      return;
+    }
+
     setUploading(true);
     setJobResult(null);
     setUploadPct(0);
 
     try {
-      toast.success('Processing images...');
+      toast.success('Starting local AI processing...');
       
-      const pFiles: File[] = [];
+      const processedFilesList: File[] = [];
+      let successCount = 0;
+      let failCount = 0;
 
-      setStatusMsg('Preparing images...');
-      for (const f of files) {
+      // 1. Process all files locally in the browser
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setFiles(prev => prev.map(item => item.id === f.id ? { ...item, status: 'processing' } : item));
+        setUploadPct(Math.round(((i) / files.length) * 70)); // 0-70% for processing phase
+        
         try {
-          const bmp = await createImageBitmap(f.file);
-          let w = bmp.width; let h = bmp.height;
-          if (Math.max(w, h) > 1024) {
-            const ratio = 1024 / Math.max(w, h);
-            w = Math.round(w * ratio); h = Math.round(h * ratio);
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d')?.drawImage(bmp, 0, 0, w, h);
-          const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.9));
-          
-          if (blob) {
-            pFiles.push(new File([blob], f.customName, { type: 'image/jpeg' }));
-          } else {
-            pFiles.push(new File([f.file], f.customName, { type: f.file.type }));
-          }
-        } catch {
-          pFiles.push(new File([f.file], f.customName, { type: f.file.type }));
-        }
-      }
-
-      setStatusMsg('Uploading to server...');
-      setUploadPct(10);
-      const res = await uploadApi.batch(pFiles, { width: targetWidth, height: targetHeight, sizeKb: targetSizeKb }, (pct) => setUploadPct(10 + Math.round(pct * 0.4)));
-      
-      const { jobId } = res.data;
-
-      setStatusMsg('AI processing on server...');
-      setFiles(prev => prev.map(f => ({ ...f, status: 'processing' })));
-      
-      let isDone = false;
-      while (!isDone) {
-        await new Promise(r => setTimeout(r, 2000));
-        const stRes = await uploadApi.jobStatus(jobId);
-        const st = stRes.data;
-        
-        setUploadPct(50 + Math.round(st.progress / 2));
-        
-        if (st.files) {
-          setFiles(prev => prev.map((f, index) => {
-            const serverFile = st.files[index] || st.files.find((sf: any) => sf.originalName === f.customName || sf.originalName === f.file.name);
-            if (serverFile) {
-              if (serverFile.status === 'completed') {
-                const baseUrl = '';
-                return { 
-                  ...f, 
-                  status: 'done',
-                  processedPreview: serverFile.processedUrl ? baseUrl + serverFile.processedUrl : f.processedPreview 
-                };
-              }
-              if (serverFile.status === 'failed') return { ...f, status: 'error' };
-            }
-            return f;
-          }));
-        }
-        
-        if (st.status === 'completed' || st.status === 'partial') {
-          setJobResult({
-            jobId,
-            status: st.status,
-            totalFiles: st.totalFiles,
-            processedFiles: st.processedFiles,
-            failedFiles: st.failedFiles,
-            progress: 100,
-            downloadUrl: st.downloadUrl || null,
+          // Dynamic import to avoid SSR issues with canvas/wasm
+          const { processImageLocally } = await import('@/lib/processImage');
+          const finalBlob = await processImageLocally(f.file, targetWidth, targetHeight, targetSizeKb, (msg) => {
+            setStatusMsg(`[${i + 1}/${files.length}] ${msg}`);
           });
-          toast.success(`✅ Server finished processing ${st.processedFiles} photos!`);
-          isDone = true;
-          refreshUser();
-          loadJobs(); // refresh the active jobs list
+
+          const previewUrl = URL.createObjectURL(finalBlob);
+          const customName = f.customName.endsWith('.jpg') || f.customName.endsWith('.jpeg') ? f.customName : `${f.customName.split('.')[0]}.jpeg`;
+          const finalFile = new File([finalBlob], customName, { type: 'image/jpeg' });
+          
+          processedFilesList.push(finalFile);
+          
+          setFiles(prev => prev.map(item => item.id === f.id ? { 
+            ...item, 
+            status: 'done',
+            processedPreview: previewUrl
+          } : item));
+          successCount++;
+
+        } catch (err: any) {
+          console.error(`Failed to process ${f.customName}:`, err);
+          setFiles(prev => prev.map(item => item.id === f.id ? { ...item, status: 'error' } : item));
+          failCount++;
         }
       }
+
+      if (successCount === 0) {
+        throw new Error('All images failed to process. Please try uploading clearer photos.');
+      }
+
+      // 2. Upload the processed JPEGs to the backend to get a ZIP and update Job History
+      setStatusMsg('Uploading finished images to server...');
+      setUploadPct(80);
+
+      const res = await uploadApi.batchProcessed(processedFilesList, (pct) => setUploadPct(80 + Math.round(pct * 0.2)));
+      
+      const { jobId, downloadUrl } = res.data;
+
+      setJobResult({
+        jobId,
+        status: 'completed',
+        totalFiles: files.length,
+        processedFiles: successCount,
+        failedFiles: failCount,
+        progress: 100,
+        downloadUrl: downloadUrl || null,
+      });
+
+      toast.success(`✅ Successfully processed ${successCount} photos!`);
+      refreshUser();
+      loadJobs();
+
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || 'Processing failed. Please try again.';
       toast.error(msg);
     } finally {
       setUploading(false);
+      setUploadPct(100);
     }
   };
 
