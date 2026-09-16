@@ -11,8 +11,8 @@ export async function processImageLocally(
     if (onProgress) onProgress('Removing background...');
 
     // 1. Run AI background removal. In the browser, this automatically uses WASM.
-    // It returns a Blob containing a transparent PNG.
     const bgRemovedBlob = await removeBackground(file, {
+      model: 'medium',
       publicPath: 'https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/',
       progress: (key, current, total) => {
         // e.g., fetching model
