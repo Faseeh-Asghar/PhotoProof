@@ -192,6 +192,7 @@ export default function DashboardPage() {
 
         } catch (err: any) {
           console.error(`Failed to process ${f.customName}:`, err);
+          toast.error(`Error on ${f.customName}: ${err.message || 'Unknown error'}`);
           setFiles(prev => prev.map(item => item.id === f.id ? { ...item, status: 'error' } : item));
           failCount++;
         }
